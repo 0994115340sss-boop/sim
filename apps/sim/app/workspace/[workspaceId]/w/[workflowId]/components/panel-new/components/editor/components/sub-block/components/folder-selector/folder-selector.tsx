@@ -1,21 +1,15 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check } from 'lucide-react'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { GmailIcon, OutlookIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import { type Credential, getProviderIdFromServiceId, getServiceIdFromScopes } from '@/lib/oauth'
+import { cn } from '@/lib/utils'
 import { OAuthRequiredModal } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel-new/components/editor/components/sub-block/components/credential-selector/components/oauth-required-modal'
+import { useResourceList } from '@/hooks/queries/resources'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
 const logger = createLogger('FolderSelector')
@@ -61,28 +55,13 @@ export function FolderSelector({
 }: FolderSelectorProps) {
   const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
-  const [folders, setFolders] = useState<FolderInfo[]>([])
   const [selectedCredentialId, setSelectedCredentialId] = useState<Credential['id'] | ''>(
     credentialId || ''
   )
   const [selectedFolderId, setSelectedFolderId] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [isLoadingSelectedFolder, setIsLoadingSelectedFolder] = useState(false)
   const [showOAuthModal, setShowOAuthModal] = useState(false)
   const initialFetchRef = useRef(false)
-
-  // Get cached display name
-  const cachedFolderName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        const effectiveCredentialId = credentialId || selectedCredentialId
-        const effectiveValue = isPreview && previewValue !== undefined ? previewValue : value
-        if (!effectiveCredentialId || !effectiveValue) return null
-        return state.cache.folders[effectiveCredentialId]?.[effectiveValue] || null
-      },
-      [credentialId, selectedCredentialId, value, isPreview, previewValue]
-    )
-  )
 
   // Initialize selectedFolderId with the effective value
   useEffect(() => {
@@ -112,9 +91,27 @@ export function FolderSelector({
     return getProviderIdFromServiceId(effectiveServiceId)
   }
 
+  // Determine endpoint based on provider
+  const endpoint = provider === 'outlook' ? '/api/tools/outlook/folders' : '/api/tools/gmail/labels'
+
+  // Fetch folders using the generic hook
+  const {
+    data: folders = [],
+    isLoading,
+    refetch,
+  } = useResourceList<FolderInfo>({
+    resourceType: provider === 'outlook' ? 'folders' : 'labels',
+    credential: selectedCredentialId || undefined,
+    endpoint,
+    enabled:
+      !disabled &&
+      !!selectedCredentialId &&
+      (provider === 'gmail' || provider === 'outlook') &&
+      !isForeignCredential,
+  })
+
   // Fetch available credentials for this provider
   const fetchCredentials = useCallback(async () => {
-    setIsLoading(true)
     try {
       const providerId = getProviderId()
       const response = await fetch(`/api/auth/oauth/credentials?provider=${providerId}`)
@@ -144,8 +141,6 @@ export function FolderSelector({
       }
     } catch (error) {
       logger.error('Error fetching credentials:', { error })
-    } finally {
-      setIsLoading(false)
     }
   }, [provider, getProviderId, selectedCredentialId])
 
@@ -212,97 +207,6 @@ export function FolderSelector({
     [selectedCredentialId, onFolderInfoChange, provider, workflowId]
   )
 
-  // Fetch folders from Gmail or Outlook
-  const fetchFolders = useCallback(
-    async (searchQuery?: string) => {
-      if (!selectedCredentialId) return
-
-      setIsLoading(true)
-      try {
-        // Construct query parameters
-        const queryParams = new URLSearchParams({
-          credentialId: selectedCredentialId,
-        })
-
-        if (searchQuery) {
-          queryParams.append('query', searchQuery)
-        }
-
-        // Determine the API endpoint based on provider
-        let apiEndpoint: string
-        if (provider === 'outlook') {
-          // Skip list fetch for collaborators; only show selected
-          if (isForeignCredential) {
-            setFolders([])
-            setIsLoading(false)
-            return
-          }
-          apiEndpoint = `/api/tools/outlook/folders?${queryParams.toString()}`
-        } else {
-          // Default to Gmail
-          apiEndpoint = `/api/tools/gmail/labels?${queryParams.toString()}`
-        }
-
-        const response = await fetch(apiEndpoint)
-
-        if (response.ok) {
-          const data = await response.json()
-          const folderList = provider === 'outlook' ? data.folders : data.labels
-          setFolders(folderList || [])
-
-          // Cache folder names in display names store
-          if (selectedCredentialId && folderList) {
-            const folderMap = folderList.reduce(
-              (acc: Record<string, string>, folder: FolderInfo) => {
-                acc[folder.id] = folder.name
-                return acc
-              },
-              {}
-            )
-            useDisplayNamesStore
-              .getState()
-              .setDisplayNames('folders', selectedCredentialId, folderMap)
-          }
-
-          // Only notify parent if callback exists
-          if (selectedFolderId && onFolderInfoChange) {
-            const folderInfo = folderList.find(
-              (folder: FolderInfo) => folder.id === selectedFolderId
-            )
-            if (folderInfo) {
-              onFolderInfoChange(folderInfo)
-            } else if (!searchQuery && provider !== 'outlook') {
-              // Only try to fetch by ID for Gmail if this is not a search query
-              // and we couldn't find the folder in the list
-              fetchFolderById(selectedFolderId)
-            }
-          }
-        } else {
-          const text = await response.text()
-          if (response.status === 401 || response.status === 403) {
-            logger.info('Folder list fetch unauthorized (expected for collaborator)')
-          } else {
-            logger.warn('Error fetching folders', { status: response.status, text })
-          }
-          setFolders([])
-        }
-      } catch (error) {
-        logger.error('Error fetching folders:', { error })
-        setFolders([])
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [
-      selectedCredentialId,
-      selectedFolderId,
-      onFolderInfoChange,
-      fetchFolderById,
-      provider,
-      isForeignCredential,
-    ]
-  )
-
   // Fetch credentials on initial mount
   useEffect(() => {
     if (disabled) return
@@ -312,13 +216,60 @@ export function FolderSelector({
     }
   }, [fetchCredentials, disabled])
 
-  // Fetch folders when credential is selected
+  // Cache folder names in display names store when data changes
   useEffect(() => {
-    if (disabled) return
-    if (selectedCredentialId) {
-      fetchFolders()
+    if (selectedCredentialId && folders.length > 0) {
+      const folderMap = folders.reduce((acc: Record<string, string>, folder: FolderInfo) => {
+        acc[folder.id] = folder.name
+        return acc
+      }, {})
+      useDisplayNamesStore.getState().setDisplayNames('folders', selectedCredentialId, folderMap)
     }
-  }, [selectedCredentialId, fetchFolders, disabled])
+  }, [selectedCredentialId, folders])
+
+  // Get cached display name to check if we need eager fetching
+  const cachedFolderName = useMemo(() => {
+    const effectiveCredentialId = credentialId || selectedCredentialId
+    if (!effectiveCredentialId || !selectedFolderId) return null
+    return (
+      useDisplayNamesStore.getState().cache.folders[effectiveCredentialId]?.[selectedFolderId] ||
+      null
+    )
+  }, [credentialId, selectedCredentialId, selectedFolderId])
+
+  // Eager caching: If we have a value but no cached name, fetch folders immediately
+  // This fixes the bug where folder names show "-" on page refresh until user clicks the block
+  useEffect(() => {
+    if (
+      selectedFolderId &&
+      selectedCredentialId &&
+      !cachedFolderName &&
+      !isLoading &&
+      !isForeignCredential
+    ) {
+      refetch()
+    }
+  }, [
+    selectedFolderId,
+    selectedCredentialId,
+    cachedFolderName,
+    isLoading,
+    isForeignCredential,
+    refetch,
+  ])
+
+  // Notify parent of selected folder info when folders list changes
+  useEffect(() => {
+    if (selectedFolderId && onFolderInfoChange && folders.length > 0) {
+      const folderInfo = folders.find((folder: FolderInfo) => folder.id === selectedFolderId)
+      if (folderInfo) {
+        onFolderInfoChange(folderInfo)
+      } else if (provider !== 'outlook') {
+        // Only try to fetch by ID for Gmail
+        fetchFolderById(selectedFolderId)
+      }
+    }
+  }, [selectedFolderId, folders, onFolderInfoChange, provider, fetchFolderById])
 
   // Keep internal selectedFolderId in sync with the value prop
   useEffect(() => {
@@ -346,25 +297,6 @@ export function FolderSelector({
     setOpen(false)
   }
 
-  const handleSearch = (value: string) => {
-    if (value.length > 2) {
-      fetchFolders(value)
-    } else if (value.length === 0) {
-      fetchFolders()
-    }
-  }
-
-  const getFolderIcon = (size: 'sm' | 'md' = 'sm') => {
-    const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'
-    if (provider === 'gmail') {
-      return <GmailIcon className={iconSize} />
-    }
-    if (provider === 'outlook') {
-      return <OutlookIcon className={iconSize} />
-    }
-    return null
-  }
-
   const getProviderName = () => {
     if (provider === 'outlook') return 'Outlook'
     return 'Gmail'
@@ -375,147 +307,143 @@ export function FolderSelector({
     return 'labels'
   }
 
+  // Convert folders to ComboboxOption format
+  const folderOptions = useMemo(
+    () =>
+      folders.map(
+        (folder: FolderInfo): ComboboxOption => ({
+          label: folder.name,
+          value: folder.id,
+          icon: provider === 'gmail' ? GmailIcon : provider === 'outlook' ? OutlookIcon : undefined,
+          metadata: folder,
+        })
+      ),
+    [folders, provider]
+  )
+
+  // Get display name from cache
+  const getDisplayName = useCallback(
+    (folderId: string) => {
+      const effectiveCredentialId = credentialId || selectedCredentialId
+      if (!effectiveCredentialId || !folderId) return null
+      return (
+        useDisplayNamesStore.getState().cache.folders[effectiveCredentialId]?.[folderId] || null
+      )
+    },
+    [credentialId, selectedCredentialId]
+  )
+
+  // Account switcher component
+  const accountSwitcher = useMemo(() => {
+    if (credentials.length === 0 || !selectedCredentialId) return null
+
+    const selectedCred = credentials.find((cred) => cred.id === selectedCredentialId)
+
+    return (
+      <div className='flex items-center justify-between border-[var(--surface-11)] border-b px-3 py-2'>
+        <div className='flex items-center gap-2'>
+          <span className='text-muted-foreground text-xs'>{selectedCred?.name || 'Unknown'}</span>
+        </div>
+        {credentials.length > 1 && (
+          <Button
+            variant='ghost'
+            size='sm'
+            className='h-6 px-2 text-xs'
+            onClick={(e) => {
+              e.stopPropagation()
+              // Show account selection
+            }}
+          >
+            Switch
+          </Button>
+        )}
+      </div>
+    )
+  }, [credentials, selectedCredentialId])
+
+  // Empty state renderer
+  const renderEmpty = useMemo(() => {
+    if (credentials.length === 0) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='font-medium text-sm'>No accounts connected.</p>
+          <p className='text-muted-foreground text-xs'>
+            Connect a {getProviderName()} account to continue.
+          </p>
+          <Button
+            variant='outline'
+            size='sm'
+            className='mt-2'
+            onClick={(e) => {
+              e.stopPropagation()
+              handleAddCredential()
+            }}
+          >
+            Connect {getProviderName()} account
+          </Button>
+        </div>
+      )
+    }
+
+    return (
+      <div className='p-4 text-center'>
+        <p className='font-medium text-sm'>No {getFolderLabel()} found.</p>
+        <p className='text-muted-foreground text-xs'>Try a different search or account.</p>
+      </div>
+    )
+  }, [credentials.length, getFolderLabel, getProviderName, handleAddCredential])
+
+  // Account selection section for multi-account scenario
+  const renderAbove = useMemo(() => {
+    if (credentials.length <= 1) return null
+
+    return (
+      <div className='border-[var(--surface-11)] border-b pb-2'>
+        <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Switch Account</div>
+        {credentials.map((cred) => (
+          <div
+            key={cred.id}
+            className={cn(
+              'flex cursor-pointer items-center justify-between rounded-[4px] px-[8px] py-[6px] font-medium font-sans text-sm hover:bg-[var(--surface-11)]',
+              cred.id === selectedCredentialId && 'bg-[var(--surface-9)]'
+            )}
+            onClick={() => setSelectedCredentialId(cred.id)}
+          >
+            <span className='font-normal'>{cred.name}</span>
+            {cred.id === selectedCredentialId && <Check className='ml-auto h-4 w-4' />}
+          </div>
+        ))}
+      </div>
+    )
+  }, [credentials, selectedCredentialId])
+
+  // Handler for combobox change
+  const handleComboboxChange = useCallback(
+    (folderId: string, metadata?: any) => {
+      const folderInfo = metadata as FolderInfo | undefined
+      handleSelectFolder(folderInfo || { id: folderId, name: folderId, type: 'folder' })
+    },
+    [handleSelectFolder]
+  )
+
   return (
     <>
       <div className='space-y-2'>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='w-full justify-between'
-              disabled={disabled || isForeignCredential}
-            >
-              {cachedFolderName ? (
-                <div className='flex items-center gap-2 overflow-hidden'>
-                  {getFolderIcon('sm')}
-                  <span className='truncate font-normal'>{cachedFolderName}</span>
-                </div>
-              ) : (
-                <div className='flex items-center gap-2'>
-                  {getFolderIcon('sm')}
-                  <span className='text-muted-foreground'>{label}</span>
-                </div>
-              )}
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          {!isForeignCredential && (
-            <PopoverContent className='w-[300px] p-0' align='start'>
-              {/* Current account indicator */}
-              {selectedCredentialId && credentials.length > 0 && (
-                <div className='flex items-center justify-between border-b px-3 py-2'>
-                  <div className='flex items-center gap-2'>
-                    <span className='text-muted-foreground text-xs'>
-                      {credentials.find((cred) => cred.id === selectedCredentialId)?.name ||
-                        'Unknown'}
-                    </span>
-                  </div>
-                  {credentials.length > 1 && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => setOpen(true)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              <Command>
-                <CommandInput
-                  placeholder={`Search ${getFolderLabel()}...`}
-                  onValueChange={handleSearch}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    {isLoading ? (
-                      <div className='flex items-center justify-center p-4'>
-                        <RefreshCw className='h-4 w-4 animate-spin' />
-                        <span className='ml-2'>Loading {getFolderLabel()}...</span>
-                      </div>
-                    ) : credentials.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No accounts connected.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Connect a {getProviderName()} account to continue.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No {getFolderLabel()} found.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Try a different search or account.
-                        </p>
-                      </div>
-                    )}
-                  </CommandEmpty>
-
-                  {/* Account selection - only show if we have multiple accounts */}
-                  {credentials.length > 1 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Switch Account
-                      </div>
-                      {credentials.map((cred) => (
-                        <CommandItem
-                          key={cred.id}
-                          value={`account-${cred.id}`}
-                          onSelect={() => setSelectedCredentialId(cred.id)}
-                        >
-                          <div className='flex items-center gap-2'>
-                            <span className='font-normal'>{cred.name}</span>
-                          </div>
-                          {cred.id === selectedCredentialId && (
-                            <Check className='ml-auto h-4 w-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Folders list */}
-                  {folders.length > 0 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        {getFolderLabel().charAt(0).toUpperCase() + getFolderLabel().slice(1)}
-                      </div>
-                      {folders.map((folder) => (
-                        <CommandItem
-                          key={folder.id}
-                          value={`folder-${folder.id}-${folder.name}`}
-                          onSelect={() => handleSelectFolder(folder)}
-                        >
-                          <div className='flex w-full items-center gap-2 overflow-hidden'>
-                            {getFolderIcon('sm')}
-                            <span className='truncate font-normal'>{folder.name}</span>
-                            {folder.id === selectedFolderId && (
-                              <Check className='ml-auto h-4 w-4' />
-                            )}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Connect account option - only show if no credentials */}
-                  {credentials.length === 0 && (
-                    <CommandGroup>
-                      <CommandItem onSelect={handleAddCredential}>
-                        <div className='flex items-center gap-2 text-foreground'>
-                          <span>Connect {getProviderName()} account</span>
-                        </div>
-                      </CommandItem>
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          )}
-        </Popover>
+        <Combobox
+          options={folderOptions}
+          value={selectedFolderId}
+          onChange={handleComboboxChange}
+          placeholder={label}
+          disabled={disabled || isForeignCredential}
+          searchable={false}
+          isLoading={isLoading || isLoadingSelectedFolder}
+          getDisplayName={getDisplayName}
+          icon={provider === 'gmail' ? GmailIcon : provider === 'outlook' ? OutlookIcon : undefined}
+          accountSwitcher={accountSwitcher}
+          renderAbove={renderAbove}
+          renderEmpty={renderEmpty}
+          onOpenChange={setOpen}
+        />
       </div>
 
       {showOAuthModal && (

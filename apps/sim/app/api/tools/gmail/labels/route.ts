@@ -18,6 +18,120 @@ interface GmailLabel {
   messagesUnread?: number
 }
 
+async function fetchGmailLabels(
+  credentialId: string,
+  userId: string,
+  query?: string,
+  requestId?: string
+) {
+  const rid = requestId || generateRequestId()
+
+  const accessToken = await refreshAccessTokenIfNeeded(credentialId, userId, rid)
+
+  if (!accessToken) {
+    throw new Error('Failed to obtain valid access token')
+  }
+
+  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+
+  logger.info(`[${rid}] Gmail API response status: ${response.status}`)
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    logger.error(`[${rid}] Gmail API error response: ${errorText}`)
+
+    try {
+      const error = JSON.parse(errorText)
+      throw new Error(JSON.stringify(error))
+    } catch (_e) {
+      throw new Error(errorText)
+    }
+  }
+
+  const data = await response.json()
+  if (!Array.isArray(data.labels)) {
+    logger.error(`[${rid}] Unexpected labels response structure:`, data)
+    throw new Error('Invalid labels response')
+  }
+
+  const labels = data.labels.map((label: GmailLabel) => {
+    let formattedName = label.name
+
+    if (label.type === 'system') {
+      formattedName = label.name.charAt(0).toUpperCase() + label.name.slice(1).toLowerCase()
+    }
+
+    return {
+      id: label.id,
+      name: formattedName,
+      type: label.type,
+      messagesTotal: label.messagesTotal || 0,
+      messagesUnread: label.messagesUnread || 0,
+    }
+  })
+
+  const filteredLabels = query
+    ? labels.filter((label: GmailLabel) =>
+        label.name.toLowerCase().includes((query as string).toLowerCase())
+      )
+    : labels
+
+  return filteredLabels
+}
+
+export async function POST(request: NextRequest) {
+  const requestId = generateRequestId()
+
+  try {
+    const session = await getSession()
+
+    if (!session?.user?.id) {
+      logger.warn(`[${requestId}] Unauthenticated labels request rejected`)
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const credentialId = body.credential
+    const query = body.query
+
+    if (!credentialId) {
+      logger.warn(`[${requestId}] Missing credentialId parameter`)
+      return NextResponse.json({ error: 'Credential ID is required' }, { status: 400 })
+    }
+
+    let credentials = await db
+      .select()
+      .from(account)
+      .where(and(eq(account.id, credentialId), eq(account.userId, session.user.id)))
+      .limit(1)
+
+    if (!credentials.length) {
+      credentials = await db.select().from(account).where(eq(account.id, credentialId)).limit(1)
+      if (!credentials.length) {
+        logger.warn(`[${requestId}] Credential not found`)
+        return NextResponse.json({ error: 'Credential not found' }, { status: 404 })
+      }
+    }
+
+    const credential = credentials[0]
+
+    logger.info(
+      `[${requestId}] Using credential: ${credential.id}, provider: ${credential.providerId}`
+    )
+
+    const labels = await fetchGmailLabels(credentialId, credential.userId, query, requestId)
+
+    return NextResponse.json({ labels }, { status: 200 })
+  } catch (error) {
+    logger.error(`[${requestId}] Error fetching Gmail labels:`, error)
+    return NextResponse.json({ error: 'Failed to fetch Gmail labels' }, { status: 500 })
+  }
+}
+
 export async function GET(request: NextRequest) {
   const requestId = generateRequestId()
 

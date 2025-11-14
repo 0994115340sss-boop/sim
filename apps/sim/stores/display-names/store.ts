@@ -16,6 +16,7 @@ interface DisplayNamesCache {
   files: Record<string, Record<string, string>> // credentialContext -> id -> name
   folders: Record<string, Record<string, string>> // credentialContext -> id -> name
   projects: Record<string, Record<string, string>> // provider-credential -> id -> name
+  teams: Record<string, Record<string, string>> // provider-credential -> id -> name
   documents: Record<string, Record<string, string>> // knowledgeBaseId -> id -> name
 }
 
@@ -65,6 +66,7 @@ const initialCache: DisplayNamesCache = {
   files: {},
   folders: {},
   projects: {},
+  teams: {},
   documents: {},
 }
 

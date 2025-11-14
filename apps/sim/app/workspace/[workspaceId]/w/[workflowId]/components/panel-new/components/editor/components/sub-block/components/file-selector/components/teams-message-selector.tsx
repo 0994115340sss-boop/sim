@@ -1,18 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ExternalLink, X } from 'lucide-react'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { MicrosoftTeamsIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
@@ -68,7 +60,6 @@ export function TeamsMessageSelector({
   workflowId,
   isForeignCredential = false,
 }: TeamsMessageSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [teams, setTeams] = useState<TeamsMessageInfo[]>([])
   const [channels, setChannels] = useState<TeamsMessageInfo[]>([])
@@ -85,17 +76,6 @@ export function TeamsMessageSelector({
   const [error, setError] = useState<string | null>(null)
   const [selectionStage, setSelectionStage] = useState<'team' | 'channel' | 'chat'>(selectionType)
   const lastRestoredValueRef = useRef<string | null>(null)
-
-  // Get cached display name
-  const cachedMessageName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        if (!credential || !value) return null
-        return state.cache.files[credential]?.[value] || null
-      },
-      [credential, value]
-    )
-  )
 
   // Determine the appropriate service ID based on provider and scopes
   const getServiceId = (): string => {
@@ -369,10 +349,8 @@ export function TeamsMessageSelector({
   // Handle open change
   const handleOpenChange = (isOpen: boolean) => {
     if (disabled || isForeignCredential) {
-      setOpen(false)
       return
     }
-    setOpen(isOpen)
     // Only fetch data when opening the dropdown
     if (isOpen && selectedCredentialId) {
       if (selectionStage === 'team') {
@@ -403,7 +381,6 @@ export function TeamsMessageSelector({
     onMessageInfoChange?.(team)
     setSelectionStage('channel')
     fetchChannels(team.teamId || '')
-    setOpen(false)
   }
 
   // Handle channel selection
@@ -414,7 +391,6 @@ export function TeamsMessageSelector({
     setSelectedMessageId(channel.channelId || '')
     onChange(channel.channelId || '', channel)
     onMessageInfoChange?.(channel)
-    setOpen(false)
   }
 
   // Handle chat selection
@@ -424,14 +400,12 @@ export function TeamsMessageSelector({
     setSelectedMessageId(chat.id)
     onChange(chat.id, chat)
     onMessageInfoChange?.(chat)
-    setOpen(false)
   }
 
   // Handle adding a new credential
   const handleAddCredential = () => {
     // Show the OAuth modal
     setShowOAuthModal(true)
-    setOpen(false)
   }
 
   // Clear selection
@@ -447,73 +421,113 @@ export function TeamsMessageSelector({
     setSelectionStage(selectionType) // Reset to the initial selection type
   }
 
-  // Render dropdown options based on the current selection stage
-  const renderSelectionOptions = () => {
+  // Convert teams/channels/chats to ComboboxOption format based on selection stage
+  const options = useMemo<ComboboxOption[]>(() => {
     if (selectionStage === 'team' && teams.length > 0) {
-      return (
-        <CommandGroup>
-          <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Teams</div>
-          {teams.map((team) => (
-            <CommandItem
-              key={team.id}
-              value={`team-${team.id}-${team.displayName}`}
-              onSelect={() => handleSelectTeam(team)}
-            >
-              <div className='flex items-center gap-2 overflow-hidden'>
-                <MicrosoftTeamsIcon className='h-4 w-4' />
-                <span className='truncate font-normal'>{team.displayName}</span>
-              </div>
-              {team.teamId === selectedTeamId && <Check className='ml-auto h-4 w-4' />}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-      )
+      return teams.map((team) => ({
+        label: team.displayName,
+        value: team.id,
+        icon: MicrosoftTeamsIcon as ComponentType<{ className?: string }>,
+        metadata: team,
+      }))
     }
 
     if (selectionStage === 'channel' && channels.length > 0) {
-      return (
-        <CommandGroup>
-          <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Channels</div>
-          {channels.map((channel) => (
-            <CommandItem
-              key={channel.id}
-              value={`channel-${channel.id}-${channel.displayName}`}
-              onSelect={() => handleSelectChannel(channel)}
-            >
-              <div className='flex items-center gap-2 overflow-hidden'>
-                <MicrosoftTeamsIcon className='h-4 w-4' />
-                <span className='truncate font-normal'>{channel.displayName}</span>
-              </div>
-              {channel.channelId === selectedChannelId && <Check className='ml-auto h-4 w-4' />}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-      )
+      return channels.map((channel) => ({
+        label: channel.displayName,
+        value: channel.id,
+        icon: MicrosoftTeamsIcon as ComponentType<{ className?: string }>,
+        metadata: channel,
+      }))
     }
 
     if (selectionStage === 'chat' && chats.length > 0) {
-      return (
-        <CommandGroup>
-          <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Chats</div>
-          {chats.map((chat) => (
-            <CommandItem
-              key={chat.id}
-              value={`chat-${chat.id}-${chat.displayName}`}
-              onSelect={() => handleSelectChat(chat)}
-            >
-              <div className='flex items-center gap-2 overflow-hidden'>
-                <MicrosoftTeamsIcon className='h-4 w-4' />
-                <span className='truncate font-normal'>{chat.displayName}</span>
-              </div>
-              {chat.chatId === selectedChatId && <Check className='ml-auto h-4 w-4' />}
-            </CommandItem>
-          ))}
-        </CommandGroup>
-      )
+      return chats.map((chat) => ({
+        label: chat.displayName,
+        value: chat.id,
+        icon: MicrosoftTeamsIcon as ComponentType<{ className?: string }>,
+        metadata: chat,
+      }))
     }
 
-    return null
+    return []
+  }, [selectionStage, teams, channels, chats])
+
+  // Handle selection based on stage
+  const handleSelection = (selectedValue: string, metadata?: any) => {
+    const info = metadata as TeamsMessageInfo | undefined
+
+    if (!info) return
+
+    if (selectionStage === 'team') {
+      handleSelectTeam(info)
+    } else if (selectionStage === 'channel') {
+      handleSelectChannel(info)
+    } else if (selectionStage === 'chat') {
+      handleSelectChat(info)
+    }
   }
+
+  // Get display name from cache
+  const getDisplayName = useCallback(
+    (messageId: string) => {
+      if (!credential || !messageId) return null
+      return useDisplayNamesStore.getState().cache.files[credential]?.[messageId] || null
+    },
+    [credential]
+  )
+
+  // Custom render for each option
+  const renderOption = useCallback((option: ComboboxOption) => {
+    return (
+      <>
+        <MicrosoftTeamsIcon className='mr-[8px] h-4 w-4 flex-shrink-0 opacity-60' />
+        <span className='flex-1 truncate text-[var(--text-primary)]'>{option.label}</span>
+      </>
+    )
+  }, [])
+
+  // Account switcher component
+  const accountSwitcher = useMemo(() => {
+    if (!selectedCredentialId || credentials.length <= 1) return null
+
+    return (
+      <div className='border-[var(--surface-11)] border-b pb-1'>
+        <div className='mb-1 px-2 font-medium text-[var(--text-muted)] text-xs'>Switch Account</div>
+        {credentials.map((cred) => (
+          <div
+            key={cred.id}
+            className='flex cursor-pointer items-center justify-between rounded px-2 py-1 hover:bg-[var(--surface-11)]'
+            onClick={() => {
+              setSelectedCredentialId(cred.id)
+            }}
+          >
+            <div className='flex items-center gap-2'>
+              <MicrosoftTeamsIcon className='h-4 w-4' />
+              <span className='text-sm'>{cred.name}</span>
+            </div>
+            {cred.id === selectedCredentialId && (
+              <svg
+                width='16'
+                height='16'
+                viewBox='0 0 16 16'
+                fill='none'
+                className='text-[var(--text-primary)]'
+              >
+                <path
+                  d='M13.5 4.5L6 12L2.5 8.5'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+              </svg>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }, [selectedCredentialId, credentials])
 
   // Restore team selection on page refresh
   const restoreTeamSelection = useCallback(
@@ -750,161 +764,68 @@ export function TeamsMessageSelector({
     restoreChannelSelection,
   ])
 
+  // Determine empty message based on current state
+  const emptyMessage = useMemo(() => {
+    if (credentials.length === 0) {
+      return `No accounts connected. Connect a Microsoft Teams account to ${
+        selectionStage === 'chat'
+          ? 'access your chats'
+          : selectionStage === 'channel'
+            ? 'see your channels'
+            : 'continue'
+      }.`
+    }
+
+    if (selectionStage === 'team') {
+      return 'No teams found. Try a different account.'
+    }
+
+    if (selectionStage === 'channel') {
+      if (!selectedTeamId) {
+        return 'Please select a team first to see its channels.'
+      }
+      return 'This team has no channels or you may not have access.'
+    }
+
+    if (selectionStage === 'chat') {
+      return 'No chats found. Try a different account or check if you have any active chats.'
+    }
+
+    return 'No items found.'
+  }, [credentials.length, selectionStage, selectedTeamId])
+
+  // Determine placeholder based on selection stage and type
+  const placeholder = useMemo(() => {
+    if (selectionType === 'channel' && selectionStage === 'team') {
+      return 'Select a team first'
+    }
+    return label
+  }, [selectionType, selectionStage, label])
+
   return (
     <>
       <div className='space-y-2'>
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='h-10 w-full min-w-0 justify-between'
-              disabled={disabled || isForeignCredential}
-            >
-              <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-                {cachedMessageName ? (
-                  <>
-                    <MicrosoftTeamsIcon className='h-4 w-4' />
-                    <span className='truncate font-normal'>{cachedMessageName}</span>
-                  </>
-                ) : (
-                  <>
-                    <MicrosoftTeamsIcon className='h-4 w-4' />
-                    <span className='truncate text-muted-foreground'>
-                      {selectionType === 'channel' && selectionStage === 'team'
-                        ? 'Select a team first'
-                        : label}
-                    </span>
-                  </>
-                )}
-              </div>
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          {!isForeignCredential && (
-            <PopoverContent className='w-[300px] p-0' align='start'>
-              {/* Current account indicator */}
-              {selectedCredentialId && credentials.length > 0 && (
-                <div className='flex items-center justify-between border-b px-3 py-2'>
-                  <div className='flex items-center gap-2'>
-                    <MicrosoftTeamsIcon className='h-4 w-4' />
-                    <span className='text-muted-foreground text-xs'>
-                      {credentials.find((cred) => cred.id === selectedCredentialId)?.name ||
-                        'Unknown'}
-                    </span>
-                  </div>
-                  {credentials.length > 1 && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => setOpen(true)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              <Command>
-                <CommandInput placeholder={`Search ${selectionStage}s...`} />
-                <CommandList>
-                  <CommandEmpty>
-                    {isLoading ? (
-                      <div className='flex items-center justify-center p-4'>
-                        <RefreshCw className='h-4 w-4 animate-spin' />
-                        <span className='ml-2'>Loading {selectionStage}s...</span>
-                      </div>
-                    ) : error ? (
-                      <div className='p-4 text-center'>
-                        <p className='text-destructive text-sm'>{error}</p>
-                        {selectionStage === 'chat' && error.includes('teams') && (
-                          <p className='mt-1 text-muted-foreground text-xs'>
-                            There was an issue fetching chats. Please try again or connect a
-                            different account.
-                          </p>
-                        )}
-                      </div>
-                    ) : credentials.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No accounts connected.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Connect a Microsoft Teams account to{' '}
-                          {selectionStage === 'chat'
-                            ? 'access your chats'
-                            : selectionStage === 'channel'
-                              ? 'see your channels'
-                              : 'continue'}
-                          .
-                        </p>
-                      </div>
-                    ) : (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No {selectionStage}s found.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          {selectionStage === 'team'
-                            ? 'Try a different account.'
-                            : selectionStage === 'channel'
-                              ? selectedTeamId
-                                ? 'This team has no channels or you may not have access.'
-                                : 'Please select a team first to see its channels.'
-                              : 'Try a different account or check if you have any active chats.'}
-                        </p>
-                      </div>
-                    )}
-                  </CommandEmpty>
-
-                  {/* Account selection - only show if we have multiple accounts */}
-                  {credentials.length > 1 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Switch Account
-                      </div>
-                      {credentials.map((cred) => (
-                        <CommandItem
-                          key={cred.id}
-                          value={`account-${cred.id}`}
-                          onSelect={() => {
-                            setSelectedCredentialId(cred.id)
-                            setOpen(false)
-                          }}
-                        >
-                          <div className='flex items-center gap-2'>
-                            <MicrosoftTeamsIcon className='h-4 w-4' />
-                            <span className='font-normal'>{cred.name}</span>
-                          </div>
-                          {cred.id === selectedCredentialId && (
-                            <Check className='ml-auto h-4 w-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Display appropriate options based on selection stage */}
-                  {renderSelectionOptions()}
-
-                  {/* Connect account option - only show if no credentials */}
-                  {credentials.length === 0 && (
-                    <CommandGroup>
-                      <CommandItem onSelect={handleAddCredential}>
-                        <div className='flex items-center gap-2 text-foreground'>
-                          <MicrosoftTeamsIcon className='h-4 w-4' />
-                          <span>Connect Microsoft Teams account</span>
-                        </div>
-                      </CommandItem>
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          )}
-        </Popover>
+        <Combobox
+          options={options}
+          value={selectedMessageId}
+          onChange={handleSelection}
+          placeholder={placeholder}
+          disabled={disabled || isForeignCredential}
+          editable={true}
+          isLoading={isLoading}
+          error={error}
+          getDisplayName={getDisplayName}
+          renderOption={renderOption}
+          onOpenChange={handleOpenChange}
+          emptyMessage={emptyMessage}
+          accountSwitcher={accountSwitcher}
+          allowClear={false}
+          className={isForeignCredential ? 'cursor-help' : undefined}
+        />
 
         {/* Selection preview */}
         {showPreview && selectedMessage && (
-          <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>
+          <div className='relative rounded-md border border-muted bg-muted/10 p-2'>
             <div className='absolute top-2 right-2'>
               <Button
                 variant='ghost'

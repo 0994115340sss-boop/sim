@@ -1,17 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useParams } from 'next/navigation'
+import { Badge, Button, Combobox, Input } from '@/components/emcn'
 import { Trash } from '@/components/emcn/icons/trash'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { formatDisplayText } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel-new/components/editor/components/sub-block/components/formatted-text'
@@ -68,6 +60,7 @@ export function VariablesInput({
   const valueInputRefs = useRef<Record<string, HTMLInputElement | HTMLTextAreaElement>>({})
   const overlayRefs = useRef<Record<string, HTMLDivElement>>({})
   const [dragHighlight, setDragHighlight] = useState<Record<string, boolean>>({})
+  const [collapsedAssignments, setCollapsedAssignments] = useState<Record<string, boolean>>({})
 
   const currentWorkflowVariables = Object.values(workflowVariables).filter(
     (v: Variable) => v.workflowId === workflowId
@@ -75,6 +68,7 @@ export function VariablesInput({
 
   const value = isPreview ? previewValue : storeValue
   const assignments: VariableAssignment[] = value || []
+  const isReadOnly = isPreview || disabled
 
   const getAvailableVariablesFor = (currentAssignmentId: string) => {
     const otherSelectedIds = new Set(
@@ -91,8 +85,19 @@ export function VariablesInput({
   const allVariablesAssigned =
     !hasNoWorkflowVariables && getAvailableVariablesFor('new').length === 0
 
+  // Initialize with one empty assignment if none exist and not in preview/disabled mode
+  useEffect(() => {
+    if (!isReadOnly && assignments.length === 0 && currentWorkflowVariables.length > 0) {
+      const initialAssignment: VariableAssignment = {
+        ...DEFAULT_ASSIGNMENT,
+        id: crypto.randomUUID(),
+      }
+      setStoreValue([initialAssignment])
+    }
+  }, []) // Only run on mount
+
   const addAssignment = () => {
-    if (isPreview || disabled) return
+    if (isPreview || disabled || allVariablesAssigned) return
 
     const newAssignment: VariableAssignment = {
       ...DEFAULT_ASSIGNMENT,
@@ -219,6 +224,13 @@ export function VariablesInput({
     setDragHighlight((prev) => ({ ...prev, [assignmentId]: false }))
   }
 
+  const toggleCollapse = (assignmentId: string) => {
+    setCollapsedAssignments((prev) => ({
+      ...prev,
+      [assignmentId]: !prev[assignmentId],
+    }))
+  }
+
   if (isPreview && (!assignments || assignments.length === 0)) {
     return (
       <div className='flex flex-col items-center justify-center rounded-md border border-border/40 border-dashed bg-muted/20 py-8 text-center'>
@@ -268,201 +280,191 @@ export function VariablesInput({
   }
 
   return (
-    <div className='space-y-2'>
-      {assignments && assignments.length > 0 ? (
-        <div className='space-y-2'>
-          {assignments.map((assignment) => {
+    <div className='space-y-[8px]'>
+      {assignments && assignments.length > 0 && (
+        <div className='space-y-[8px]'>
+          {assignments.map((assignment, index) => {
+            const collapsed = collapsedAssignments[assignment.id] || false
+            const availableVars = getAvailableVariablesFor(assignment.id)
+
             return (
               <div
                 key={assignment.id}
-                className='group relative rounded-lg border border-border/50 bg-background/50 p-3 transition-all hover:border-border hover:bg-background'
-              >
-                {!isPreview && !disabled && (
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    className='absolute top-2 right-2 h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100'
-                    onClick={() => removeAssignment(assignment.id)}
-                  >
-                    <Trash className='h-3.5 w-3.5 text-muted-foreground hover:text-destructive' />
-                  </Button>
+                data-assignment-id={assignment.id}
+                className={cn(
+                  'rounded-[4px] border border-[var(--border-strong)] bg-[#1F1F1F]',
+                  collapsed ? 'overflow-hidden' : 'overflow-visible'
                 )}
-
-                <div className='space-y-3'>
-                  <div className='space-y-1.5'>
-                    <div className='flex items-center justify-between pr-8'>
-                      <Label className='text-xs'>Variable</Label>
-                      {assignment.variableName && (
-                        <span className='rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground'>
-                          {assignment.type}
-                        </span>
-                      )}
-                    </div>
-                    <Select
-                      value={assignment.variableId || assignment.variableName || ''}
-                      onValueChange={(value) => {
-                        if (value === '__new__') {
-                          return
-                        }
-                        handleVariableSelect(assignment.id, value)
-                      }}
-                      disabled={isPreview || disabled}
-                    >
-                      <SelectTrigger className='h-9 border border-input bg-white dark:border-input/60 dark:bg-background'>
-                        <SelectValue placeholder='Select a variable...' />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(() => {
-                          const availableVars = getAvailableVariablesFor(assignment.id)
-                          return availableVars.length > 0 ? (
-                            availableVars.map((variable) => (
-                              <SelectItem key={variable.id} value={variable.id}>
-                                {variable.name}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className='p-2 text-center text-muted-foreground text-sm'>
-                              {currentWorkflowVariables.length > 0
-                                ? 'All variables have been assigned.'
-                                : 'No variables defined in this workflow.'}
-                              {currentWorkflowVariables.length === 0 && (
-                                <>
-                                  <br />
-                                  Add them in the Variables panel.
-                                </>
-                              )}
-                            </div>
-                          )
-                        })()}
-                      </SelectContent>
-                    </Select>
+              >
+                <div
+                  className='flex cursor-pointer items-center justify-between bg-transparent px-[10px] py-[5px]'
+                  onClick={() => toggleCollapse(assignment.id)}
+                >
+                  <div className='flex min-w-0 flex-1 items-center gap-[8px]'>
+                    <span className='block truncate font-medium text-[14px] text-[var(--text-tertiary)]'>
+                      {assignment.variableName || `Variable ${index + 1}`}
+                    </span>
+                    {assignment.variableName && (
+                      <Badge className='h-[20px] text-[13px]'>{assignment.type}</Badge>
+                    )}
                   </div>
-
-                  <div className='space-y-1.5'>
-                    <Label className='text-xs'>Value</Label>
-                    {assignment.type === 'object' || assignment.type === 'array' ? (
-                      <div className='relative'>
-                        <Textarea
-                          ref={(el) => {
-                            if (el) valueInputRefs.current[assignment.id] = el
-                          }}
-                          value={assignment.value || ''}
-                          onChange={(e) =>
-                            handleValueInputChange(
-                              assignment.id,
-                              e.target.value,
-                              e.target.selectionStart ?? undefined
-                            )
-                          }
-                          placeholder={
-                            assignment.type === 'object'
-                              ? '{\n  "key": "value"\n}'
-                              : '[\n  1, 2, 3\n]'
-                          }
-                          disabled={isPreview || disabled}
-                          className={cn(
-                            'min-h-[120px] border border-input bg-white font-mono text-sm text-transparent caret-foreground placeholder:text-muted-foreground/50 dark:border-input/60 dark:bg-background',
-                            dragHighlight[assignment.id] && 'ring-2 ring-blue-500 ring-offset-2'
-                          )}
-                          style={{
-                            fontFamily: 'inherit',
-                            lineHeight: 'inherit',
-                            wordBreak: 'break-word',
-                            whiteSpace: 'pre-wrap',
-                          }}
-                          onDrop={(e) => handleDrop(e, assignment.id)}
-                          onDragOver={(e) => handleDragOver(e, assignment.id)}
-                          onDragLeave={(e) => handleDragLeave(e, assignment.id)}
-                        />
-                        <div
-                          ref={(el) => {
-                            if (el) overlayRefs.current[assignment.id] = el
-                          }}
-                          className='pointer-events-none absolute inset-0 flex items-start overflow-auto bg-transparent px-3 py-2 font-mono text-sm'
-                          style={{
-                            fontFamily: 'inherit',
-                            lineHeight: 'inherit',
-                          }}
-                        >
-                          <div className='w-full whitespace-pre-wrap break-words'>
-                            {formatDisplayText(assignment.value || '', {
-                              accessiblePrefixes,
-                              highlightAll: !accessiblePrefixes,
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className='relative'>
-                        <Input
-                          ref={(el) => {
-                            if (el) valueInputRefs.current[assignment.id] = el
-                          }}
-                          value={assignment.value || ''}
-                          onChange={(e) =>
-                            handleValueInputChange(
-                              assignment.id,
-                              e.target.value,
-                              e.target.selectionStart ?? undefined
-                            )
-                          }
-                          placeholder={`${assignment.type} value`}
-                          disabled={isPreview || disabled}
-                          autoComplete='off'
-                          className={cn(
-                            'h-9 border border-input bg-white text-transparent caret-foreground placeholder:text-muted-foreground/50 dark:border-input/60 dark:bg-background',
-                            dragHighlight[assignment.id] && 'ring-2 ring-blue-500 ring-offset-2'
-                          )}
-                          onDrop={(e) => handleDrop(e, assignment.id)}
-                          onDragOver={(e) => handleDragOver(e, assignment.id)}
-                          onDragLeave={(e) => handleDragLeave(e, assignment.id)}
-                        />
-                        <div
-                          ref={(el) => {
-                            if (el) overlayRefs.current[assignment.id] = el
-                          }}
-                          className='pointer-events-none absolute inset-0 flex items-center overflow-hidden bg-transparent px-3 text-sm'
-                        >
-                          <div className='w-full whitespace-nowrap'>
-                            {formatDisplayText(assignment.value || '', {
-                              accessiblePrefixes,
-                              highlightAll: !accessiblePrefixes,
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {showTags && activeFieldId === assignment.id && (
-                      <TagDropdown
-                        visible={showTags}
-                        onSelect={handleTagSelect}
-                        blockId={blockId}
-                        activeSourceBlockId={activeSourceBlockId}
-                        inputValue={assignment.value || ''}
-                        cursorPosition={cursorPosition}
-                        onClose={() => setShowTags(false)}
-                        className='absolute top-full left-0 z-50 mt-1'
-                      />
-                    )}
+                  <div
+                    className='flex items-center gap-[8px] pl-[8px]'
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      variant='ghost'
+                      onClick={addAssignment}
+                      disabled={isPreview || disabled || allVariablesAssigned}
+                      className='h-auto p-0'
+                    >
+                      <Plus className='h-[14px] w-[14px]' />
+                      <span className='sr-only'>Add Variable</span>
+                    </Button>
+                    <Button
+                      variant='ghost'
+                      onClick={() => removeAssignment(assignment.id)}
+                      disabled={isPreview || disabled || assignments.length === 1}
+                      className='h-auto p-0 text-[var(--text-error)] hover:text-[var(--text-error)]'
+                    >
+                      <Trash className='h-[14px] w-[14px]' />
+                      <span className='sr-only'>Delete Variable</span>
+                    </Button>
                   </div>
                 </div>
+
+                {!collapsed && (
+                  <div className='flex flex-col gap-[6px] border-[var(--border-strong)] border-t px-[10px] pt-[6px] pb-[10px]'>
+                    <div className='flex flex-col gap-[4px]'>
+                      <Label className='text-[13px]'>Variable</Label>
+                      <Combobox
+                        options={availableVars.map((v) => ({ label: v.name, value: v.id }))}
+                        value={assignment.variableId || assignment.variableName || ''}
+                        onChange={(value) => handleVariableSelect(assignment.id, value)}
+                        placeholder='Select a variable...'
+                        disabled={isPreview || disabled}
+                      />
+                    </div>
+
+                    <div className='space-y-[4px]'>
+                      <Label className='text-[13px]'>Value</Label>
+                      {assignment.type === 'object' || assignment.type === 'array' ? (
+                        <div className='relative'>
+                          <Textarea
+                            ref={(el) => {
+                              if (el) valueInputRefs.current[assignment.id] = el
+                            }}
+                            value={assignment.value || ''}
+                            onChange={(e) =>
+                              handleValueInputChange(
+                                assignment.id,
+                                e.target.value,
+                                e.target.selectionStart ?? undefined
+                              )
+                            }
+                            placeholder={
+                              assignment.type === 'object'
+                                ? '{\n  "key": "value"\n}'
+                                : '[\n  1, 2, 3\n]'
+                            }
+                            disabled={isPreview || disabled}
+                            className={cn(
+                              'min-h-[120px] font-mono text-sm text-transparent caret-foreground placeholder:text-muted-foreground/50',
+                              dragHighlight[assignment.id] && 'ring-2 ring-blue-500 ring-offset-2'
+                            )}
+                            style={{
+                              fontFamily: 'inherit',
+                              lineHeight: 'inherit',
+                              wordBreak: 'break-word',
+                              whiteSpace: 'pre-wrap',
+                            }}
+                            onDrop={(e) => handleDrop(e, assignment.id)}
+                            onDragOver={(e) => handleDragOver(e, assignment.id)}
+                            onDragLeave={(e) => handleDragLeave(e, assignment.id)}
+                          />
+                          <div
+                            ref={(el) => {
+                              if (el) overlayRefs.current[assignment.id] = el
+                            }}
+                            className='pointer-events-none absolute inset-0 flex items-start overflow-auto bg-transparent px-3 py-2 font-mono text-sm'
+                            style={{
+                              fontFamily: 'inherit',
+                              lineHeight: 'inherit',
+                            }}
+                          >
+                            <div className='w-full whitespace-pre-wrap break-words'>
+                              {formatDisplayText(assignment.value || '', {
+                                accessiblePrefixes,
+                                highlightAll: !accessiblePrefixes,
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className='relative'>
+                          <Input
+                            ref={(el) => {
+                              if (el) valueInputRefs.current[assignment.id] = el
+                            }}
+                            name='value'
+                            value={assignment.value || ''}
+                            onChange={(e) =>
+                              handleValueInputChange(
+                                assignment.id,
+                                e.target.value,
+                                e.target.selectionStart ?? undefined
+                              )
+                            }
+                            placeholder={`${assignment.type} value`}
+                            disabled={isPreview || disabled}
+                            autoComplete='off'
+                            className={cn(
+                              'allow-scroll w-full overflow-auto text-transparent caret-foreground',
+                              dragHighlight[assignment.id] && 'ring-2 ring-blue-500 ring-offset-2'
+                            )}
+                            style={{ overflowX: 'auto' }}
+                            onDrop={(e) => handleDrop(e, assignment.id)}
+                            onDragOver={(e) => handleDragOver(e, assignment.id)}
+                            onDragLeave={(e) => handleDragLeave(e, assignment.id)}
+                          />
+                          <div
+                            ref={(el) => {
+                              if (el) overlayRefs.current[assignment.id] = el
+                            }}
+                            className='pointer-events-none absolute inset-0 flex items-center overflow-x-auto bg-transparent px-[8px] py-[6px] font-medium font-sans text-sm'
+                            style={{ overflowX: 'auto' }}
+                          >
+                            <div
+                              className='w-full whitespace-pre'
+                              style={{ scrollbarWidth: 'none', minWidth: 'fit-content' }}
+                            >
+                              {formatDisplayText(
+                                assignment.value || '',
+                                accessiblePrefixes ? { accessiblePrefixes } : { highlightAll: true }
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {showTags && activeFieldId === assignment.id && (
+                        <TagDropdown
+                          visible={showTags}
+                          onSelect={handleTagSelect}
+                          blockId={blockId}
+                          activeSourceBlockId={activeSourceBlockId}
+                          inputValue={assignment.value || ''}
+                          cursorPosition={cursorPosition}
+                          onClose={() => setShowTags(false)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
-      ) : null}
-
-      {!isPreview && !disabled && !hasNoWorkflowVariables && (
-        <Button
-          onClick={addAssignment}
-          variant='outline'
-          className='h-9 w-full border-dashed'
-          disabled={allVariablesAssigned}
-        >
-          <Plus className='mr-2 h-4 w-4' />
-          {allVariablesAssigned ? 'All Variables Assigned' : 'Add Variable Assignment'}
-        </Button>
       )}
     </div>
   )

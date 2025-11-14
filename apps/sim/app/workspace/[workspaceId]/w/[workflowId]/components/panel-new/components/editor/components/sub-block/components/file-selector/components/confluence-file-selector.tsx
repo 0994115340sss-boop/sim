@@ -1,18 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { type ComponentType, useCallback, useEffect, useRef, useState } from 'react'
+import { Check, ExternalLink, X } from 'lucide-react'
+import { Combobox, type ComboboxOption } from '@/components/emcn'
 import { ConfluenceIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
@@ -66,7 +58,6 @@ export function ConfluenceFileSelector({
   workflowId,
   isForeignCredential = false,
 }: ConfluenceFileSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [files, setFiles] = useState<ConfluenceFileInfo[]>([])
   const [selectedCredentialId, setSelectedCredentialId] = useState<string>(credentialId || '')
@@ -94,34 +85,6 @@ export function ConfluenceFileSelector({
       setSelectedCredentialId(credentialId)
     }
   }, [credentialId, selectedCredentialId])
-
-  // Handle search with debounce
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const handleSearch = (value: string) => {
-    // Clear any existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    // Set a new timeout
-    searchTimeoutRef.current = setTimeout(() => {
-      if (value.length > 2) {
-        fetchFiles(value)
-      } else if (value.length === 0) {
-        fetchFiles()
-      }
-    }, 500) // 500ms debounce
-  }
-
-  // Clean up the timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [])
 
   // Determine the appropriate service ID based on provider and scopes
   const getServiceId = (): string => {
@@ -371,15 +334,22 @@ export function ConfluenceFileSelector({
     }
   }, [fetchCredentials])
 
-  // Only fetch files when the dropdown is opened, not on credential selection
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-
-    // Only fetch files when opening the dropdown and if we have valid credentials and domain
-    if (isOpen && !isForeignCredential && selectedCredentialId && domain && domain.includes('.')) {
-      fetchFiles()
-    }
-  }
+  // Fetch files when dropdown is opened
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      // Only fetch files when opening the dropdown and if we have valid credentials and domain
+      if (
+        isOpen &&
+        !isForeignCredential &&
+        selectedCredentialId &&
+        domain &&
+        domain.includes('.')
+      ) {
+        fetchFiles()
+      }
+    },
+    [isForeignCredential, selectedCredentialId, domain, fetchFiles]
+  )
 
   // Keep internal selectedFileId in sync with the value prop
   useEffect(() => {
@@ -404,173 +374,146 @@ export function ConfluenceFileSelector({
   }, [value, selectedCredentialId, domain, selectedFile, fetchPageInfo])
 
   // Handle file selection
-  const handleSelectFile = (file: ConfluenceFileInfo) => {
-    setSelectedFileId(file.id)
-    setSelectedFile(file)
-    onChange(file.id, file)
-    onFileInfoChange?.(file)
-    setOpen(false)
+  const handleSelectFile = (selectedValue: string, metadata?: any) => {
+    const file = metadata as ConfluenceFileInfo | undefined
+    if (file) {
+      setSelectedFileId(file.id)
+      setSelectedFile(file)
+      onChange(file.id, file)
+      onFileInfoChange?.(file)
+    }
   }
 
   // Handle adding a new credential
   const handleAddCredential = () => {
     // Show the OAuth modal
     setShowOAuthModal(true)
-    setOpen(false)
   }
 
+  // Handle search with server-side debouncing
+  const handleSearch = useCallback(
+    (query: string) => {
+      if (query.length > 2) {
+        fetchFiles(query)
+      } else if (query.length === 0) {
+        fetchFiles()
+      }
+    },
+    [selectedCredentialId, domain, workflowId, isForeignCredential]
+  )
+
   // Clear selection
-  const handleClearSelection = () => {
+  const handleClearSelection = useCallback(() => {
     setSelectedFileId('')
+    setSelectedFile(null)
     onChange('', undefined)
     onFileInfoChange?.(null)
+  }, [onChange, onFileInfoChange])
+
+  // Get display name from cache
+  const getDisplayName = useCallback(
+    (pageId: string) => {
+      if (!selectedCredentialId) return null
+      return useDisplayNamesStore.getState().cache.files[selectedCredentialId]?.[pageId] || null
+    },
+    [selectedCredentialId]
+  )
+
+  // Render account switcher
+  const renderAccountSwitcher = () => {
+    if (credentials.length <= 1) return null
+
+    return (
+      <div className='border-[var(--surface-11)] border-b pb-1'>
+        <div className='mb-1 px-2 font-medium text-[var(--text-muted)] text-xs'>Switch Account</div>
+        {credentials.map((cred) => (
+          <div
+            key={cred.id}
+            className='flex cursor-pointer items-center justify-between rounded px-2 py-1 hover:bg-[var(--surface-11)]'
+            onClick={() => setSelectedCredentialId(cred.id)}
+          >
+            <div className='flex items-center gap-2'>
+              <ConfluenceIcon className='h-4 w-4' />
+              <span className='text-sm'>{cred.name}</span>
+            </div>
+            {cred.id === selectedCredentialId && (
+              <svg
+                width='16'
+                height='16'
+                viewBox='0 0 16 16'
+                fill='none'
+                className='text-[var(--text-primary)]'
+              >
+                <path
+                  d='M13.5 4.5L6 12L2.5 8.5'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+              </svg>
+            )}
+          </div>
+        ))}
+      </div>
+    )
   }
+
+  // Convert files to ComboboxOption format
+  const fileOptions: ComboboxOption[] = files.map((file) => ({
+    label: file.name,
+    value: file.id,
+    icon: ConfluenceIcon as ComponentType<{ className?: string }>,
+    metadata: file,
+  }))
+
+  // Custom render for options
+  const renderOption = useCallback(
+    (option: ComboboxOption) => {
+      return (
+        <>
+          <ConfluenceIcon className='mr-[8px] h-4 w-4 flex-shrink-0 opacity-60' />
+          <span className='flex-1 truncate text-[var(--text-primary)]'>{option.label}</span>
+          {option.value === selectedFileId && <Check className='ml-[8px] h-4 w-4 flex-shrink-0' />}
+        </>
+      )
+    },
+    [selectedFileId]
+  )
+
+  // Error/empty message
+  const emptyMessage = !selectedCredentialId
+    ? 'Please select a Confluence account.'
+    : !domain || !domain.includes('.')
+      ? 'Please provide a valid domain.'
+      : credentials.length === 0
+        ? 'No accounts connected. Connect a Confluence account to continue.'
+        : error
+          ? error
+          : 'No pages found. Try a different search or account.'
 
   return (
     <>
       <div className='space-y-2'>
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='h-10 w-full min-w-0 justify-between'
-              disabled={disabled || !domain || isForeignCredential}
-            >
-              <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-                {cachedFileName ? (
-                  <>
-                    <ConfluenceIcon className='h-4 w-4' />
-                    <span className='truncate font-normal'>{cachedFileName}</span>
-                  </>
-                ) : (
-                  <>
-                    <ConfluenceIcon className='h-4 w-4' />
-                    <span className='truncate text-muted-foreground'>{label}</span>
-                  </>
-                )}
-              </div>
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          {!isForeignCredential && (
-            <PopoverContent className='w-[300px] p-0' align='start'>
-              {/* Current account indicator */}
-              {selectedCredentialId && credentials.length > 0 && (
-                <div className='flex items-center justify-between border-b px-3 py-2'>
-                  <div className='flex items-center gap-2'>
-                    <ConfluenceIcon className='h-4 w-4' />
-                    <span className='text-muted-foreground text-xs'>
-                      {credentials.find((cred) => cred.id === selectedCredentialId)?.name ||
-                        'Unknown'}
-                    </span>
-                  </div>
-                  {credentials.length > 1 && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => setOpen(true)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              <Command>
-                <CommandInput placeholder='Search pages...' onValueChange={handleSearch} />
-                <CommandList>
-                  <CommandEmpty>
-                    {isLoading ? (
-                      <div className='flex items-center justify-center p-4'>
-                        <RefreshCw className='h-4 w-4 animate-spin' />
-                        <span className='ml-2'>Loading pages...</span>
-                      </div>
-                    ) : error ? (
-                      <div className='p-4 text-center'>
-                        <p className='text-destructive text-sm'>{error}</p>
-                      </div>
-                    ) : credentials.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No accounts connected.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Connect a Confluence account to continue.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No pages found.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Try a different search or account.
-                        </p>
-                      </div>
-                    )}
-                  </CommandEmpty>
-
-                  {/* Account selection - only show if we have multiple accounts */}
-                  {credentials.length > 1 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Switch Account
-                      </div>
-                      {credentials.map((cred) => (
-                        <CommandItem
-                          key={cred.id}
-                          value={`account-${cred.id}`}
-                          onSelect={() => setSelectedCredentialId(cred.id)}
-                        >
-                          <div className='flex items-center gap-2'>
-                            <ConfluenceIcon className='h-4 w-4' />
-                            <span className='font-normal'>{cred.name}</span>
-                          </div>
-                          {cred.id === selectedCredentialId && (
-                            <Check className='ml-auto h-4 w-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Files list */}
-                  {files.length > 0 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Pages
-                      </div>
-                      {files.map((file) => (
-                        <CommandItem
-                          key={file.id}
-                          value={`file-${file.id}-${file.name}`}
-                          onSelect={() => handleSelectFile(file)}
-                        >
-                          <div className='flex items-center gap-2 overflow-hidden'>
-                            <ConfluenceIcon className='h-4 w-4' />
-                            <span className='truncate font-normal'>{file.name}</span>
-                          </div>
-                          {file.id === selectedFileId && <Check className='ml-auto h-4 w-4' />}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Connect account option - only show if no credentials */}
-                  {credentials.length === 0 && (
-                    <CommandGroup>
-                      <CommandItem onSelect={handleAddCredential}>
-                        <div className='flex items-center gap-2 text-foreground'>
-                          <ConfluenceIcon className='h-4 w-4' />
-                          <span>Connect Confluence account</span>
-                        </div>
-                      </CommandItem>
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          )}
-        </Popover>
+        <Combobox
+          options={fileOptions}
+          value={selectedFileId}
+          onChange={handleSelectFile}
+          placeholder={label}
+          disabled={disabled || !domain || isForeignCredential}
+          editable={true}
+          isLoading={isLoading}
+          error={error}
+          getDisplayName={getDisplayName}
+          renderOption={renderOption}
+          onOpenChange={handleOpenChange}
+          onSearch={handleSearch}
+          accountSwitcher={renderAccountSwitcher()}
+          emptyMessage={emptyMessage}
+          allowClear={!!selectedFileId}
+          onClear={handleClearSelection}
+          className={isForeignCredential ? 'cursor-help' : undefined}
+        />
 
         {showPreview && selectedFile && selectedFileId && selectedFile.id === selectedFileId && (
           <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>
@@ -597,7 +540,7 @@ export function ConfluenceFileSelector({
                     </span>
                   )}
                 </div>
-                {selectedFile.webViewLink && (
+                {selectedFile.webViewLink ? (
                   <a
                     href={selectedFile.webViewLink}
                     target='_blank'
@@ -608,6 +551,19 @@ export function ConfluenceFileSelector({
                     <span>Open in Confluence</span>
                     <ExternalLink className='h-3 w-3' />
                   </a>
+                ) : (
+                  selectedFile.url && (
+                    <a
+                      href={selectedFile.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='flex items-center gap-1 text-foreground text-xs hover:underline'
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span>Open in Confluence</span>
+                      <ExternalLink className='h-3 w-3' />
+                    </a>
+                  )
                 )}
               </div>
             </div>

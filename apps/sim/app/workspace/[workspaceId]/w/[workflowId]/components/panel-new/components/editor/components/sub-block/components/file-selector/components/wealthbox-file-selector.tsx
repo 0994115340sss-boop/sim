@@ -1,17 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X } from 'lucide-react'
+import { Button } from '@/components/emcn/components/button/button'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { WealthboxIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
@@ -60,7 +53,6 @@ export function WealthboxFileSelector({
   itemType = 'contact',
   credentialId,
 }: WealthboxFileSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [selectedCredentialId, setSelectedCredentialId] = useState<string>(credentialId || '')
   const [selectedItemId, setSelectedItemId] = useState(value)
@@ -69,7 +61,6 @@ export function WealthboxFileSelector({
   const [isLoadingSelectedItem, setIsLoadingSelectedItem] = useState(false)
   const [isLoadingItems, setIsLoadingItems] = useState(false)
   const [availableItems, setAvailableItems] = useState<WealthboxItemInfo[]>([])
-  const [searchQuery, setSearchQuery] = useState<string>('')
   const [showOAuthModal, setShowOAuthModal] = useState(false)
   const [credentialsLoaded, setCredentialsLoaded] = useState(false)
   const initialFetchRef = useRef(false)
@@ -125,54 +116,54 @@ export function WealthboxFileSelector({
     }
   }, [credentialId, selectedCredentialId])
 
-  // Debounced search function
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
-
   // Fetch available items for the selected credential
-  const fetchAvailableItems = useCallback(async () => {
-    if (!selectedCredentialId) return
+  const fetchAvailableItems = useCallback(
+    async (searchQuery?: string) => {
+      if (!selectedCredentialId) return
 
-    setIsLoadingItems(true)
-    try {
-      const queryParams = new URLSearchParams({
-        credentialId: selectedCredentialId,
-        type: itemType,
-      })
-
-      if (searchQuery.trim()) {
-        queryParams.append('query', searchQuery.trim())
-      }
-
-      const response = await fetch(`/api/auth/oauth/wealthbox/items?${queryParams.toString()}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setAvailableItems(data.items || [])
-
-        // Cache item names in display names store
-        if (selectedCredentialId && data.items) {
-          const itemMap = data.items.reduce(
-            (acc: Record<string, string>, item: WealthboxItemInfo) => {
-              acc[item.id] = item.name
-              return acc
-            },
-            {}
-          )
-          useDisplayNamesStore.getState().setDisplayNames('files', selectedCredentialId, itemMap)
-        }
-      } else {
-        logger.error('Error fetching available items:', {
-          error: await response.text(),
+      setIsLoadingItems(true)
+      try {
+        const queryParams = new URLSearchParams({
+          credentialId: selectedCredentialId,
+          type: itemType,
         })
+
+        if (searchQuery?.trim()) {
+          queryParams.append('query', searchQuery.trim())
+        }
+
+        const response = await fetch(`/api/auth/oauth/wealthbox/items?${queryParams.toString()}`)
+
+        if (response.ok) {
+          const data = await response.json()
+          setAvailableItems(data.items || [])
+
+          // Cache item names in display names store
+          if (selectedCredentialId && data.items) {
+            const itemMap = data.items.reduce(
+              (acc: Record<string, string>, item: WealthboxItemInfo) => {
+                acc[item.id] = item.name
+                return acc
+              },
+              {}
+            )
+            useDisplayNamesStore.getState().setDisplayNames('files', selectedCredentialId, itemMap)
+          }
+        } else {
+          logger.error('Error fetching available items:', {
+            error: await response.text(),
+          })
+          setAvailableItems([])
+        }
+      } catch (error) {
+        logger.error('Error fetching available items:', { error })
         setAvailableItems([])
+      } finally {
+        setIsLoadingItems(false)
       }
-    } catch (error) {
-      logger.error('Error fetching available items:', { error })
-      setAvailableItems([])
-    } finally {
-      setIsLoadingItems(false)
-    }
-  }, [selectedCredentialId, searchQuery, itemType])
+    },
+    [selectedCredentialId, itemType]
+  )
 
   // Fetch a single item by ID
   const fetchItemById = useCallback(
@@ -234,12 +225,15 @@ export function WealthboxFileSelector({
     }
   }, [fetchCredentials])
 
-  // Fetch available items only when dropdown is opened
-  useEffect(() => {
-    if (selectedCredentialId && open) {
-      fetchAvailableItems()
-    }
-  }, [selectedCredentialId, open, fetchAvailableItems])
+  // Handle open change to fetch items when dropdown is opened
+  const handleOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (isOpen && selectedCredentialId) {
+        fetchAvailableItems()
+      }
+    },
+    [selectedCredentialId, fetchAvailableItems]
+  )
 
   // Fetch item info on mount if we have a value but no selectedItem state
   useEffect(() => {
@@ -256,186 +250,177 @@ export function WealthboxFileSelector({
     }
   }, [value, onFileInfoChange])
 
-  // Handle search input changes with debouncing
-  const handleSearchChange = useCallback(
-    (newQuery: string) => {
-      setSearchQuery(newQuery)
-
-      // Clear existing timeout
-      if (searchTimeout) {
-        clearTimeout(searchTimeout)
+  // Handle search input changes with debouncing built into Combobox
+  const handleSearch = useCallback(
+    (searchQuery: string) => {
+      if (searchQuery.length > 0) {
+        fetchAvailableItems(searchQuery)
+      } else {
+        fetchAvailableItems()
       }
-
-      // Set new timeout for search
-      const timeout = setTimeout(() => {
-        if (selectedCredentialId) {
-          fetchAvailableItems()
-        }
-      }, 300) // 300ms debounce
-
-      setSearchTimeout(timeout)
     },
-    [selectedCredentialId, fetchAvailableItems, searchTimeout]
+    [fetchAvailableItems]
   )
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout)
+  // Handle selecting an item from the combobox
+  const handleSelect = useCallback(
+    (itemId: string) => {
+      const item = availableItems.find((i) => i.id === itemId)
+      if (item) {
+        setSelectedItemId(item.id)
+        setSelectedItem(item)
+        onChange(item.id, item)
+        onFileInfoChange?.(item)
       }
-    }
-  }, [searchTimeout])
-
-  // Handle selecting an item
-  const handleItemSelect = (item: WealthboxItemInfo) => {
-    setSelectedItemId(item.id)
-    setSelectedItem(item)
-    onChange(item.id, item)
-    onFileInfoChange?.(item)
-    setOpen(false)
-    setSearchQuery('')
-  }
+    },
+    [availableItems, onChange, onFileInfoChange]
+  )
 
   // Handle adding a new credential
-  const handleAddCredential = () => {
+  const handleAddCredential = useCallback(() => {
     setShowOAuthModal(true)
-    setOpen(false)
-    setSearchQuery('')
-  }
+  }, [])
 
   // Clear selection
-  const handleClearSelection = () => {
+  const handleClearSelection = useCallback(() => {
     setSelectedItemId('')
     onChange('', undefined)
     onFileInfoChange?.(null)
-  }
+  }, [onChange, onFileInfoChange])
 
-  const getItemTypeLabel = () => {
-    switch (itemType) {
-      case 'contact':
-        return 'Contacts'
-      default:
-        return 'Contacts'
+  // Get display name from cache
+  const getDisplayName = useCallback(
+    (itemId: string) => {
+      if (!selectedCredentialId) return null
+      return useDisplayNamesStore.getState().cache.files[selectedCredentialId]?.[itemId] || null
+    },
+    [selectedCredentialId]
+  )
+
+  // Convert items to ComboboxOption format
+  const itemOptions: ComboboxOption[] = useMemo(() => {
+    return availableItems.map((item) => ({
+      label: item.name,
+      value: item.id,
+      icon: WealthboxIcon,
+      metadata: item,
+    }))
+  }, [availableItems])
+
+  // Render account switcher for multiple credentials
+  const renderAccountSwitcher = useMemo(() => {
+    if (credentials.length <= 1) return null
+
+    return (
+      <div className='border-[var(--surface-11)] border-b pb-1'>
+        <div className='mb-1 px-2 font-medium text-[var(--text-muted)] text-xs'>Switch Account</div>
+        {credentials.map((cred) => (
+          <div
+            key={cred.id}
+            className='flex cursor-pointer items-center justify-between rounded px-2 py-1 hover:bg-[var(--surface-11)]'
+            onClick={() => setSelectedCredentialId(cred.id)}
+          >
+            <div className='flex items-center gap-2'>
+              <WealthboxIcon className='h-4 w-4' />
+              <span className='text-sm'>{cred.name}</span>
+            </div>
+            {cred.id === selectedCredentialId && (
+              <svg
+                width='16'
+                height='16'
+                viewBox='0 0 16 16'
+                fill='none'
+                className='text-[var(--text-primary)]'
+              >
+                <path
+                  d='M13.5 4.5L6 12L2.5 8.5'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+              </svg>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }, [credentials, selectedCredentialId])
+
+  // Render footer with "Connect account" button
+  const renderFooter = useMemo(() => {
+    if (credentials.length > 0) return null
+
+    return (
+      <Button variant='ghost' className='w-full justify-start gap-2' onClick={handleAddCredential}>
+        <WealthboxIcon className='h-4 w-4' />
+        <span>Connect Wealthbox account</span>
+      </Button>
+    )
+  }, [credentials.length, handleAddCredential])
+
+  // Render empty state
+  const renderEmpty = useMemo(() => {
+    if (isLoadingItems) {
+      return (
+        <div className='flex items-center justify-center py-4'>
+          <span className='ml-2'>Loading {itemType}s...</span>
+        </div>
+      )
     }
-  }
+    if (credentials.length === 0) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='font-medium text-sm'>No accounts connected.</p>
+          <p className='text-muted-foreground text-xs'>Connect a Wealthbox account to continue.</p>
+        </div>
+      )
+    }
+    return (
+      <div className='p-4 text-center'>
+        <p className='font-medium text-sm'>No {itemType}s found.</p>
+        <p className='text-muted-foreground text-xs'>Try a different search or account.</p>
+      </div>
+    )
+  }, [isLoadingItems, credentials.length, itemType])
+
+  // Render option with custom styling
+  const renderOption = useCallback((option: ComboboxOption) => {
+    const item = option.metadata as WealthboxItemInfo
+    return (
+      <div className='flex items-center gap-2 overflow-hidden'>
+        <WealthboxIcon className='h-4 w-4' />
+        <div className='min-w-0 flex-1'>
+          <span className='truncate font-normal'>{item.name}</span>
+          {item.updatedAt && (
+            <div className='text-muted-foreground text-xs'>
+              Updated {new Date(item.updatedAt).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }, [])
 
   return (
     <>
       <div className='space-y-2'>
-        <Popover
-          open={open}
-          onOpenChange={(isOpen) => {
-            setOpen(isOpen)
-            if (!isOpen) {
-              setSearchQuery('')
-              if (searchTimeout) {
-                clearTimeout(searchTimeout)
-                setSearchTimeout(null)
-              }
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='w-full justify-between'
-              disabled={disabled}
-            >
-              {cachedItemName ? (
-                <div className='flex items-center gap-2 overflow-hidden'>
-                  <WealthboxIcon className='h-4 w-4' />
-                  <span className='truncate font-normal'>{cachedItemName}</span>
-                </div>
-              ) : (
-                <div className='flex items-center gap-2'>
-                  <WealthboxIcon className='h-4 w-4' />
-                  <span className='text-muted-foreground'>{label}</span>
-                </div>
-              )}
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className='w-[300px] p-0' align='start'>
-            <Command shouldFilter={false}>
-              <div className='flex items-center border-b px-3' cmdk-input-wrapper=''>
-                <input
-                  placeholder={`Search ${itemType}s...`}
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className='flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50'
-                />
-              </div>
-              <CommandList>
-                <CommandEmpty>
-                  {isLoadingItems ? `Loading ${itemType}s...` : `No ${itemType}s found.`}
-                </CommandEmpty>
-
-                {credentials.length > 1 && (
-                  <CommandGroup>
-                    <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                      Switch Account
-                    </div>
-                    {credentials.map((cred) => (
-                      <CommandItem
-                        key={cred.id}
-                        value={`account-${cred.id}`}
-                        onSelect={() => setSelectedCredentialId(cred.id)}
-                      >
-                        <div className='flex items-center gap-2'>
-                          <WealthboxIcon className='h-4 w-4' />
-                          <span className='font-normal'>{cred.name}</span>
-                        </div>
-                        {cred.id === selectedCredentialId && <Check className='ml-auto h-4 w-4' />}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
-
-                {availableItems.length > 0 && (
-                  <CommandGroup>
-                    <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                      {getItemTypeLabel()}
-                    </div>
-                    {availableItems.map((item) => (
-                      <CommandItem
-                        key={item.id}
-                        value={`item-${item.id}-${item.name}`}
-                        onSelect={() => handleItemSelect(item)}
-                      >
-                        <div className='flex items-center gap-2 overflow-hidden'>
-                          <WealthboxIcon className='h-4 w-4' />
-                          <div className='min-w-0 flex-1'>
-                            <span className='truncate font-normal'>{item.name}</span>
-                            {item.updatedAt && (
-                              <div className='text-muted-foreground text-xs'>
-                                Updated {new Date(item.updatedAt).toLocaleDateString()}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {item.id === selectedItemId && <Check className='ml-auto h-4 w-4' />}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                )}
-
-                {credentials.length === 0 && (
-                  <CommandGroup>
-                    <CommandItem onSelect={handleAddCredential}>
-                      <div className='flex items-center gap-2 text-foreground'>
-                        <WealthboxIcon className='h-4 w-4' />
-                        <span>Connect Wealthbox account</span>
-                      </div>
-                    </CommandItem>
-                  </CommandGroup>
-                )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <Combobox
+          options={itemOptions}
+          value={selectedItemId}
+          onChange={handleSelect}
+          placeholder={label}
+          disabled={disabled}
+          editable={true}
+          isLoading={isLoadingItems}
+          onOpenChange={handleOpenChange}
+          onSearch={handleSearch}
+          getDisplayName={getDisplayName}
+          accountSwitcher={renderAccountSwitcher}
+          renderFooter={renderFooter}
+          renderEmpty={renderEmpty}
+          renderOption={renderOption}
+        />
 
         {showPreview && selectedItem && (
           <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>

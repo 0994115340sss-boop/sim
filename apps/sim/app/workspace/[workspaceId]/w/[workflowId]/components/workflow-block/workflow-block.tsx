@@ -13,8 +13,8 @@ import {
   useBlockDimensions,
 } from '@/app/workspace/[workspaceId]/w/[workflowId]/hooks/use-block-dimensions'
 import { SELECTOR_TYPES_HYDRATION_REQUIRED, type SubBlockConfig } from '@/blocks/types'
+import { useCredentialForDisplay } from '@/hooks/queries/credential-display'
 import { useCollaborativeWorkflow } from '@/hooks/use-collaborative-workflow'
-import { useCredentialDisplay } from '@/hooks/use-credential-display'
 import { useDisplayName } from '@/hooks/use-display-name'
 import { useVariablesStore } from '@/stores/panel/variables/store'
 import { useWorkflowRegistry } from '@/stores/workflows/registry/store'
@@ -230,7 +230,7 @@ const SubBlockRow = ({
     }, {})
   }, [getStringValue, subBlock?.dependsOn])
 
-  const { displayName: credentialName } = useCredentialDisplay(
+  const { displayName: credentialName } = useCredentialForDisplay(
     subBlock?.type === 'oauth-input' && typeof rawValue === 'string' ? rawValue : undefined,
     subBlock?.provider
   )
@@ -253,7 +253,7 @@ const SubBlockRow = ({
     return typeof option === 'string' ? option : option.label
   }, [subBlock, rawValue])
 
-  const genericDisplayName = useDisplayName(subBlock, rawValue, {
+  const { displayName: genericDisplayName } = useDisplayName(subBlock, rawValue, {
     workspaceId,
     provider: subBlock?.provider,
     credentialId: typeof credentialId === 'string' ? credentialId : undefined,
@@ -332,22 +332,12 @@ export const WorkflowBlock = memo(function WorkflowBlock({
   const currentWorkflowId = params.workflowId as string
   const workspaceId = params.workspaceId as string
 
-  const {
-    currentWorkflow,
-    activeWorkflowId,
-    isEnabled,
-    isActive,
-    diffStatus,
-    isDeletedBlock,
-    isFocused,
-    handleClick,
-    hasRing,
-    ringStyles,
-  } = useBlockCore({ blockId: id, data, isPending })
+  const { currentWorkflow, activeWorkflowId, isEnabled, handleClick, hasRing, ringStyles } =
+    useBlockCore({ blockId: id, data, isPending })
 
   const currentBlock = currentWorkflow.getBlockById(id)
 
-  const { horizontalHandles, blockHeight, blockWidth, displayAdvancedMode, displayTriggerMode } =
+  const { horizontalHandles, blockWidth, displayAdvancedMode, displayTriggerMode } =
     useBlockProperties(
       id,
       currentWorkflow.isDiffMode,
@@ -432,8 +422,6 @@ export const WorkflowBlock = memo(function WorkflowBlock({
       dependentKeys.forEach((k) => collaborativeSetSubblockValue(id, k, ''))
     }
   }, [id, collaborativeSetSubblockValue])
-
-  const currentStoreBlock = currentWorkflow.getBlockById(id)
 
   const isStarterBlock = type === 'starter'
   const isWebhookTriggerBlock = type === 'webhook' || type === 'generic_webhook'

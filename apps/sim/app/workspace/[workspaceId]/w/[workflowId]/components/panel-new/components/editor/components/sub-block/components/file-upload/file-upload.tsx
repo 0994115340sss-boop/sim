@@ -1,19 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { File as FileIcon, X } from 'lucide-react'
 import { useParams } from 'next/navigation'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { createLogger } from '@/lib/logs/console/logger'
@@ -147,6 +137,17 @@ export function FileUpload({
     if (text.length <= start + end + 3) return text
     return `${text.slice(0, start)}...${text.slice(-end)}`
   }
+
+  // Convert workspace files to ComboboxOptions
+  const workspaceFileOptions = useMemo<ComboboxOption[]>(() => {
+    return availableWorkspaceFiles.map((file) => ({
+      label: file.name,
+      value: file.id,
+      icon: FileIcon,
+      subtitle: formatFileSize(file.size),
+      metadata: file,
+    }))
+  }, [availableWorkspaceFiles])
 
   /**
    * Handles file upload when new file(s) are selected
@@ -362,10 +363,10 @@ export function FileUpload({
   }
 
   /**
-   * Handle selecting an existing workspace file
+   * Handle selecting an existing workspace file from Combobox
    */
-  const handleSelectWorkspaceFile = (fileId: string) => {
-    const selectedFile = workspaceFiles.find((f) => f.id === fileId)
+  const handleSelectWorkspaceFile = (fileId: string, metadata?: any) => {
+    const selectedFile = metadata || workspaceFiles.find((f) => f.id === fileId)
     if (!selectedFile) return
 
     // Convert workspace file record to uploaded file format
@@ -641,73 +642,39 @@ export function FileUpload({
         {/* Add More dropdown for multiple files */}
         {hasFiles && multiple && !isUploading && (
           <div>
-            <Popover
-              open={addMoreOpen}
+            <Combobox
+              options={workspaceFileOptions}
+              value=''
+              onChange={(fileId, metadata) => handleSelectWorkspaceFile(fileId, metadata)}
+              placeholder='+ Add More'
+              disabled={disabled || loadingWorkspaceFiles}
+              editable={true}
+              isLoading={loadingWorkspaceFiles}
+              emptyMessage={
+                availableWorkspaceFiles.length === 0 ? 'No files available.' : 'No files found.'
+              }
               onOpenChange={(open) => {
                 setAddMoreOpen(open)
                 if (open) void loadWorkspaceFiles()
               }}
-            >
-              <PopoverTrigger asChild>
+              renderFooter={
                 <Button
-                  variant='outline'
-                  role='combobox'
-                  aria-expanded={addMoreOpen}
-                  className='relative w-full justify-between'
-                  disabled={disabled || loadingWorkspaceFiles}
+                  variant='ghost'
+                  className='w-full justify-start'
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setAddMoreOpen(false)
+                    handleOpenFileDialog({
+                      preventDefault: () => {},
+                      stopPropagation: () => {},
+                    } as React.MouseEvent)
+                  }}
                 >
-                  <span className='truncate font-normal'>+ Add More</span>
-                  <ChevronDown className='absolute right-3 h-4 w-4 shrink-0 opacity-50' />
+                  Upload New File
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className='w-[320px] p-0' align='start'>
-                <Command>
-                  <CommandInput
-                    placeholder='Search files...'
-                    className='text-foreground placeholder:text-muted-foreground'
-                  />
-                  <CommandList onWheel={(e) => e.stopPropagation()}>
-                    <CommandGroup>
-                      <CommandItem
-                        value='upload_new'
-                        onSelect={() => {
-                          setAddMoreOpen(false)
-                          handleOpenFileDialog({
-                            preventDefault: () => {},
-                            stopPropagation: () => {},
-                          } as React.MouseEvent)
-                        }}
-                      >
-                        Upload New File
-                      </CommandItem>
-                    </CommandGroup>
-                    <CommandEmpty>
-                      {availableWorkspaceFiles.length === 0
-                        ? 'No files available.'
-                        : 'No files found.'}
-                    </CommandEmpty>
-                    {availableWorkspaceFiles.length > 0 && (
-                      <CommandGroup heading='Workspace Files'>
-                        {availableWorkspaceFiles.map((file) => (
-                          <CommandItem
-                            key={file.id}
-                            value={file.name}
-                            onSelect={() => {
-                              handleSelectWorkspaceFile(file.id)
-                              setAddMoreOpen(false)
-                            }}
-                          >
-                            <span className='truncate' title={file.name}>
-                              {truncateMiddle(file.name)}
-                            </span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+              }
+            />
           </div>
         )}
       </div>
@@ -715,75 +682,39 @@ export function FileUpload({
       {/* Show dropdown selector if no files and not uploading */}
       {!hasFiles && !isUploading && (
         <div className='flex items-center'>
-          <Popover
-            open={pickerOpen}
+          <Combobox
+            options={workspaceFileOptions}
+            value=''
+            onChange={(fileId, metadata) => handleSelectWorkspaceFile(fileId, metadata)}
+            placeholder={loadingWorkspaceFiles ? 'Loading files...' : 'Select or upload file'}
+            disabled={disabled || loadingWorkspaceFiles}
+            editable={true}
+            isLoading={loadingWorkspaceFiles}
+            emptyMessage={
+              availableWorkspaceFiles.length === 0 ? 'No files available.' : 'No files found.'
+            }
             onOpenChange={(open) => {
               setPickerOpen(open)
               if (open) void loadWorkspaceFiles()
             }}
-          >
-            <PopoverTrigger asChild>
+            renderFooter={
               <Button
-                variant='outline'
-                role='combobox'
-                aria-expanded={pickerOpen}
-                className='relative w-full justify-between'
-                disabled={disabled || loadingWorkspaceFiles}
+                variant='ghost'
+                className='w-full justify-start'
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setPickerOpen(false)
+                  handleOpenFileDialog({
+                    preventDefault: () => {},
+                    stopPropagation: () => {},
+                  } as React.MouseEvent)
+                }}
               >
-                <span className='truncate font-normal'>
-                  {loadingWorkspaceFiles ? 'Loading files...' : 'Select or upload file'}
-                </span>
-                <ChevronDown className='absolute right-3 h-4 w-4 shrink-0 opacity-50' />
+                Upload New File
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className='w-[320px] p-0' align='start'>
-              <Command>
-                <CommandInput
-                  placeholder='Search files...'
-                  className='text-foreground placeholder:text-muted-foreground'
-                />
-                <CommandList onWheel={(e) => e.stopPropagation()}>
-                  <CommandGroup>
-                    <CommandItem
-                      value='upload_new'
-                      onSelect={() => {
-                        setPickerOpen(false)
-                        handleOpenFileDialog({
-                          preventDefault: () => {},
-                          stopPropagation: () => {},
-                        } as React.MouseEvent)
-                      }}
-                    >
-                      Upload New File
-                    </CommandItem>
-                  </CommandGroup>
-                  <CommandEmpty>
-                    {availableWorkspaceFiles.length === 0
-                      ? 'No files available.'
-                      : 'No files found.'}
-                  </CommandEmpty>
-                  {availableWorkspaceFiles.length > 0 && (
-                    <CommandGroup heading='Workspace Files'>
-                      {availableWorkspaceFiles.map((file) => (
-                        <CommandItem
-                          key={file.id}
-                          value={file.name}
-                          onSelect={() => {
-                            handleSelectWorkspaceFile(file.id)
-                            setPickerOpen(false)
-                          }}
-                        >
-                          <span className='truncate' title={file.name}>
-                            {truncateMiddle(file.name)}
-                          </span>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+            }
+          />
         </div>
       )}
     </div>

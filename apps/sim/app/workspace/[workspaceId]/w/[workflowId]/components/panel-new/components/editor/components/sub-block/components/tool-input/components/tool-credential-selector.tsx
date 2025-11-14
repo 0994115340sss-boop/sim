@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, ExternalLink, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/emcn/components/button/button'
 import {
@@ -9,7 +9,6 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
   getCanonicalScopesForProvider,
@@ -20,11 +19,10 @@ import {
   parseProvider,
 } from '@/lib/oauth'
 import { OAuthRequiredModal } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel-new/components/editor/components/sub-block/components/credential-selector/components/oauth-required-modal'
+import { useCredentials, useForeignCredentialMeta } from '@/hooks/queries/credentials'
 import { getMissingRequiredScopes } from '@/hooks/use-oauth-scope-status'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 import { useWorkflowRegistry } from '@/stores/workflows/registry/store'
-
-const logger = createLogger('ToolCredentialSelector')
 
 const getProviderIcon = (providerName: OAuthProvider) => {
   const { baseProvider } = parseProvider(providerName)
@@ -70,99 +68,101 @@ export function ToolCredentialSelector({
   disabled = false,
 }: ToolCredentialSelectorProps) {
   const [open, setOpen] = useState(false)
-  const [credentials, setCredentials] = useState<Credential[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const [showOAuthModal, setShowOAuthModal] = useState(false)
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(value)
   const { activeWorkflowId } = useWorkflowRegistry()
 
+  // Ref to track the last cleared credential to prevent duplicate clearing
+  const lastClearedRef = useRef<string>('')
+
+  // Sync selectedId with value prop changes
   useEffect(() => {
     setSelectedId(value)
   }, [value])
 
-  const fetchCredentials = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/auth/oauth/credentials?provider=${provider}`)
-      if (response.ok) {
-        const data = await response.json()
-        setCredentials(data.credentials || [])
+  // Fetch credentials using React Query
+  const {
+    data: credentials = [],
+    isLoading,
+    refetch: refetchCredentials,
+  } = useCredentials(provider)
 
-        // Cache credential names for block previews
-        if (provider) {
-          const credentialMap = (data.credentials || []).reduce(
-            (acc: Record<string, string>, cred: Credential) => {
-              acc[cred.id] = cred.name
-              return acc
-            },
-            {}
-          )
-          useDisplayNamesStore.getState().setDisplayNames('credentials', provider, credentialMap)
-        }
+  // Check if selected credential is foreign (owned by collaborator)
+  const isForeignCredential = !!selectedId && !credentials.some((cred) => cred.id === selectedId)
 
-        if (
-          value &&
-          !(data.credentials || []).some((cred: Credential) => cred.id === value) &&
-          activeWorkflowId
-        ) {
-          try {
-            const metaResp = await fetch(
-              `/api/auth/oauth/credentials?credentialId=${value}&workflowId=${activeWorkflowId}`
-            )
-            if (metaResp.ok) {
-              const meta = await metaResp.json()
-              if (meta.credentials?.length) {
-                const combinedCredentials = [meta.credentials[0], ...(data.credentials || [])]
-                setCredentials(combinedCredentials)
+  // Fetch foreign credential metadata if needed
+  const { data: foreignMeta } = useForeignCredentialMeta(
+    selectedId,
+    activeWorkflowId || undefined,
+    isForeignCredential
+  )
 
-                const credentialMap = combinedCredentials.reduce(
-                  (acc: Record<string, string>, cred: Credential) => {
-                    acc[cred.id] = cred.name
-                    return acc
-                  },
-                  {}
-                )
-                useDisplayNamesStore
-                  .getState()
-                  .setDisplayNames('credentials', provider, credentialMap)
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-      } else {
-        logger.error('Error fetching credentials:', { error: await response.text() })
-        setCredentials([])
-      }
-    } catch (error) {
-      logger.error('Error fetching credentials:', { error })
-      setCredentials([])
-    } finally {
-      setIsLoading(false)
+  // Merge foreign credential with the credentials list
+  const allCredentials = useMemo(() => {
+    if (!foreignMeta) return credentials
+    const credentialExists = credentials.some((cred) => cred.id === foreignMeta.id)
+    if (credentialExists) return credentials
+    return [foreignMeta, ...credentials]
+  }, [credentials, foreignMeta])
+
+  // Cache credential names in display names store
+  useMemo(() => {
+    if (provider && allCredentials.length > 0) {
+      const credentialMap = allCredentials.reduce(
+        (acc: Record<string, string>, cred: Credential) => {
+          acc[cred.id] = cred.name
+          return acc
+        },
+        {}
+      )
+      useDisplayNamesStore.getState().setDisplayNames('credentials', provider, credentialMap)
     }
-  }, [provider, value, onChange])
+  }, [provider, allCredentials])
 
-  // Fetch credentials on initial mount only
+  // Listen for credential disconnection events and refetch immediately
   useEffect(() => {
-    fetchCredentials()
-    // This effect should only run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const handleCredentialDisconnected = (event: Event) => {
+      const customEvent = event as CustomEvent
+      const { providerId } = customEvent.detail || {}
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchCredentials()
+      // Check if this disconnection affects our provider
+      if (providerId && (providerId === provider || providerId.startsWith(provider))) {
+        // Force refetch immediately to get updated credentials list
+        refetchCredentials()
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('credential-disconnected', handleCredentialDisconnected)
+    return () => window.removeEventListener('credential-disconnected', handleCredentialDisconnected)
+  }, [provider, refetchCredentials])
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+  // Clear invalid credential selection if it was disconnected
+  useEffect(() => {
+    // Don't attempt to clear while loading or if no selection
+    if (isLoading || !selectedId) return
+
+    // If credential still exists in our list, no action needed
+    if (allCredentials.some((cred) => cred.id === selectedId)) return
+
+    // If checking foreign credential and query is still pending, wait for it
+    if (isForeignCredential && foreignMeta === undefined) return
+
+    // At this point: credential doesn't exist AND foreign check is complete
+    // Only clear if it's not a valid foreign credential
+    if (foreignMeta) return
+
+    // Prevent duplicate clearing operations
+    const clearKey = `${provider}-${selectedId}`
+    if (lastClearedRef.current === clearKey) return
+    lastClearedRef.current = clearKey
+
+    // Clear the selection and cache
+    setSelectedId('')
+    onChange('')
+    if (provider) {
+      useDisplayNamesStore.getState().removeDisplayName('credentials', provider, selectedId)
     }
-  }, [fetchCredentials])
+  }, [allCredentials, selectedId, foreignMeta, isForeignCredential, isLoading, provider, onChange])
 
   const handleSelect = (credentialId: string) => {
     setSelectedId(credentialId)
@@ -170,19 +170,19 @@ export function ToolCredentialSelector({
     setOpen(false)
   }
 
-  const handleOAuthClose = () => {
+  const handleOAuthClose = useCallback(() => {
     setShowOAuthModal(false)
-    fetchCredentials()
-  }
+    refetchCredentials()
+  }, [refetchCredentials])
 
   const handleOpenChange = (isOpen: boolean) => {
     setOpen(isOpen)
     if (isOpen) {
-      fetchCredentials()
+      refetchCredentials()
     }
   }
 
-  const selectedCredential = credentials.find((cred) => cred.id === selectedId)
+  const selectedCredential = allCredentials.find((cred) => cred.id === selectedId)
   const isForeign = !!(selectedId && !selectedCredential)
 
   // Determine if additional permissions are required for the selected credential
@@ -229,7 +229,7 @@ export function ToolCredentialSelector({
                     <RefreshCw className='h-4 w-4 animate-spin' />
                     <span className='ml-2'>Loading...</span>
                   </div>
-                ) : credentials.length === 0 ? (
+                ) : allCredentials.length === 0 ? (
                   <div className='p-4 text-center'>
                     <p className='font-medium text-sm'>No accounts connected.</p>
                     <p className='text-muted-foreground text-xs'>
@@ -243,9 +243,9 @@ export function ToolCredentialSelector({
                 )}
               </CommandEmpty>
 
-              {credentials.length > 0 && (
+              {allCredentials.length > 0 && (
                 <CommandGroup>
-                  {credentials.map((credential) => (
+                  {allCredentials.map((credential) => (
                     <CommandItem
                       key={credential.id}
                       value={credential.id}

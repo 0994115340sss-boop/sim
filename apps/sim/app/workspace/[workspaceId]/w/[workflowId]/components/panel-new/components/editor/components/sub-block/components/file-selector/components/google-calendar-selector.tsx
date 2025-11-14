@@ -1,18 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Check, ChevronDown, RefreshCw, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RefreshCw, X } from 'lucide-react'
+import { Button } from '@/components/emcn/components/button/button'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { GoogleCalendarIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
@@ -49,24 +41,12 @@ export function GoogleCalendarSelector({
   credentialId,
   workflowId,
 }: GoogleCalendarSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([])
   const [selectedCalendarId, setSelectedCalendarId] = useState(value)
   const [selectedCalendar, setSelectedCalendar] = useState<GoogleCalendarInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [initialFetchDone, setInitialFetchDone] = useState(false)
-
-  // Get cached display name
-  const cachedCalendarName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        if (!credentialId || !value) return null
-        return state.cache.files[credentialId]?.[value] || null
-      },
-      [credentialId, value]
-    )
-  )
 
   const fetchCalendarsFromAPI = useCallback(async (): Promise<GoogleCalendarInfo[]> => {
     if (!credentialId) {
@@ -124,8 +104,6 @@ export function GoogleCalendarSelector({
   }, [fetchCalendarsFromAPI, credentialId])
 
   const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-
     if (isOpen && credentialId && (!initialFetchDone || calendars.length === 0)) {
       fetchCalendars()
     }
@@ -139,12 +117,14 @@ export function GoogleCalendarSelector({
   }, [value, selectedCalendarId])
 
   // Handle calendar selection
-  const handleSelectCalendar = (calendar: GoogleCalendarInfo) => {
-    setSelectedCalendarId(calendar.id)
-    setSelectedCalendar(calendar)
-    onChange(calendar.id, calendar)
-    onCalendarInfoChange?.(calendar)
-    setOpen(false)
+  const handleSelectCalendar = (calendarId: string) => {
+    const calendar = calendars.find((c) => c.id === calendarId)
+    if (calendar) {
+      setSelectedCalendarId(calendar.id)
+      setSelectedCalendar(calendar)
+      onChange(calendar.id, calendar)
+      onCalendarInfoChange?.(calendar)
+    }
   }
 
   // Clear selection
@@ -163,93 +143,94 @@ export function GoogleCalendarSelector({
     return calendar.summary
   }
 
+  // Convert calendars to ComboboxOption format
+  const options: ComboboxOption[] = useMemo(() => {
+    return calendars.map((calendar) => ({
+      label: getCalendarDisplayName(calendar),
+      value: calendar.id,
+      disabled: false,
+    }))
+  }, [calendars])
+
+  // Get display name from cache
+  const getDisplayNameFromCache = useCallback(
+    (calendarId: string) => {
+      if (!credentialId) return null
+      const displayNames = useDisplayNamesStore.getState().displayNames
+      const calendarNames = displayNames.files?.[credentialId]
+      return calendarNames?.[calendarId] || null
+    },
+    [credentialId]
+  )
+
+  // Icon component
+  const CalendarIcon = useMemo(() => {
+    return () => <GoogleCalendarIcon className='h-4 w-4' />
+  }, [])
+
+  // Render custom option with calendar color indicator
+  const renderOption = useCallback(
+    (option: ComboboxOption) => {
+      const calendar = calendars.find((c) => c.id === option.value)
+      if (!calendar) return null
+
+      return (
+        <div className='flex items-center gap-2 overflow-hidden'>
+          <div
+            className='h-3 w-3 flex-shrink-0 rounded-full'
+            style={{
+              backgroundColor: calendar.backgroundColor || '#4285f4',
+            }}
+          />
+          <span className='truncate font-normal'>{option.label}</span>
+        </div>
+      )
+    },
+    [calendars]
+  )
+
+  // Render empty state
+  const renderEmpty = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className='flex items-center justify-center py-4'>
+          <RefreshCw className='h-4 w-4 animate-spin' />
+          <span className='ml-2'>Loading calendars...</span>
+        </div>
+      )
+    }
+    if (error) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='text-destructive text-sm'>{error}</p>
+        </div>
+      )
+    }
+    return (
+      <div className='p-4 text-center'>
+        <p className='font-medium text-sm'>No calendars found</p>
+        <p className='text-muted-foreground text-xs'>
+          Please check your Google Calendar account access
+        </p>
+      </div>
+    )
+  }, [isLoading, error])
+
   return (
     <div className='space-y-2'>
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <Button
-            variant='outline'
-            role='combobox'
-            aria-expanded={open}
-            className='h-10 w-full min-w-0 justify-between'
-            disabled={disabled || !credentialId}
-          >
-            <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-              {cachedCalendarName ? (
-                <>
-                  <GoogleCalendarIcon className='h-4 w-4' />
-                  <span className='truncate font-normal'>{cachedCalendarName}</span>
-                </>
-              ) : (
-                <>
-                  <GoogleCalendarIcon className='h-4 w-4' />
-                  <span className='truncate text-muted-foreground'>{label}</span>
-                </>
-              )}
-            </div>
-            <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className='w-[300px] p-0' align='start'>
-          <Command>
-            <CommandInput placeholder='Search calendars...' />
-            <CommandList>
-              <CommandEmpty>
-                {isLoading ? (
-                  <div className='flex items-center justify-center p-4'>
-                    <RefreshCw className='h-4 w-4 animate-spin' />
-                    <span className='ml-2'>Loading calendars...</span>
-                  </div>
-                ) : error ? (
-                  <div className='p-4 text-center'>
-                    <p className='text-destructive text-sm'>{error}</p>
-                  </div>
-                ) : calendars.length === 0 ? (
-                  <div className='p-4 text-center'>
-                    <p className='font-medium text-sm'>No calendars found</p>
-                    <p className='text-muted-foreground text-xs'>
-                      Please check your Google Calendar account access
-                    </p>
-                  </div>
-                ) : (
-                  <div className='p-4 text-center'>
-                    <p className='font-medium text-sm'>No matching calendars</p>
-                  </div>
-                )}
-              </CommandEmpty>
-
-              {calendars.length > 0 && (
-                <CommandGroup>
-                  <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                    Calendars
-                  </div>
-                  {calendars.map((calendar) => (
-                    <CommandItem
-                      key={calendar.id}
-                      value={`calendar-${calendar.id}-${calendar.summary}`}
-                      onSelect={() => handleSelectCalendar(calendar)}
-                      className='cursor-pointer'
-                    >
-                      <div className='flex items-center gap-2 overflow-hidden'>
-                        <div
-                          className='h-3 w-3 flex-shrink-0 rounded-full'
-                          style={{
-                            backgroundColor: calendar.backgroundColor || '#4285f4',
-                          }}
-                        />
-                        <span className='truncate font-normal'>
-                          {getCalendarDisplayName(calendar)}
-                        </span>
-                      </div>
-                      {calendar.id === selectedCalendarId && <Check className='ml-auto h-4 w-4' />}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      <Combobox
+        options={options}
+        value={selectedCalendarId}
+        onChange={handleSelectCalendar}
+        placeholder={label}
+        disabled={disabled || !credentialId}
+        editable={true}
+        isLoading={isLoading}
+        onOpenChange={handleOpenChange}
+        getDisplayName={getDisplayNameFromCache}
+        renderOption={renderOption}
+        renderEmpty={renderEmpty}
+      />
 
       {showPreview && selectedCalendar && (
         <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>

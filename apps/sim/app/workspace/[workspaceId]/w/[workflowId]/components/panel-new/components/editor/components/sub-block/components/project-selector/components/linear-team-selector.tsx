@@ -1,16 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { Combobox, type ComboboxOption } from '@/components/emcn'
 import { LinearIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useResourceList } from '@/hooks/queries/resources'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
 export interface LinearTeamInfo {
@@ -26,6 +17,7 @@ interface LinearTeamSelectorProps {
   disabled?: boolean
   workflowId?: string
   showPreview?: boolean
+  isForeignCredential?: boolean
 }
 
 export function LinearTeamSelector({
@@ -35,156 +27,92 @@ export function LinearTeamSelector({
   label = 'Select Linear team',
   disabled = false,
   workflowId,
+  isForeignCredential = false,
 }: LinearTeamSelectorProps) {
-  const [teams, setTeams] = useState<LinearTeamInfo[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  // Fetch teams using React Query
+  const {
+    data: teams = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useResourceList<LinearTeamInfo>({
+    resourceType: 'teams',
+    credential,
+    endpoint: '/api/tools/linear/teams',
+    params: { workflowId },
+  })
 
-  // Get cached display name
-  const cachedTeamName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        if (!credential || !value) return null
-        return state.cache.projects[`linear-${credential}`]?.[value] || null
-      },
-      [credential, value]
-    )
+  const error = queryError ? (queryError as Error).message : null
+
+  // Cache team names in display names store using dedicated 'teams' type
+  useEffect(() => {
+    if (credential && teams.length > 0) {
+      const teamMap = teams.reduce((acc: Record<string, string>, team: LinearTeamInfo) => {
+        acc[team.id] = team.name
+        return acc
+      }, {})
+      useDisplayNamesStore.getState().setDisplayNames('teams', `linear-${credential}`, teamMap)
+    }
+  }, [credential, teams])
+
+  // Get cached display name from the dedicated 'teams' cache
+  const getDisplayName = useCallback(
+    (teamId: string) => {
+      if (isForeignCredential) return 'Saved by collaborator'
+      if (!credential || !teamId) return null
+      return useDisplayNamesStore.getState().cache.teams?.[`linear-${credential}`]?.[teamId] || null
+    },
+    [credential, isForeignCredential]
   )
 
+  // Get cached team name to check if we need eager fetching
+  const cachedTeamName = useMemo(() => {
+    if (!credential || !value) return null
+    return useDisplayNamesStore.getState().cache.teams?.[`linear-${credential}`]?.[value] || null
+  }, [credential, value])
+
+  // Eager caching: If we have a value but no cached name, fetch teams immediately
+  // This fixes the bug where team names show "-" on page refresh until user clicks the block
   useEffect(() => {
-    if (!credential) return
-    const controller = new AbortController()
-    setLoading(true)
-    setError(null)
+    if (value && credential && !cachedTeamName && !isLoading) {
+      refetch()
+    }
+  }, [value, credential, cachedTeamName, isLoading, refetch])
 
-    fetch('/api/tools/linear/teams', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential, workflowId }),
-      signal: controller.signal,
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
-        return res.json()
-      })
-      .then((data) => {
-        if (data.error) {
-          setError(data.error)
-          setTeams([])
-        } else {
-          setTeams(data.teams)
+  // Convert teams to combobox options
+  const options = useMemo<ComboboxOption[]>(() => {
+    return teams.map((team: LinearTeamInfo) => ({
+      label: team.name,
+      value: team.id,
+      icon: LinearIcon,
+      metadata: team,
+    }))
+  }, [teams])
 
-          // Cache team names in display names store
-          if (credential && data.teams) {
-            const teamMap = data.teams.reduce(
-              (acc: Record<string, string>, team: LinearTeamInfo) => {
-                acc[team.id] = team.name
-                return acc
-              },
-              {}
-            )
-            useDisplayNamesStore
-              .getState()
-              .setDisplayNames('projects', `linear-${credential}`, teamMap)
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name === 'AbortError') return
-        setError(err.message)
-        setTeams([])
-      })
-      .finally(() => setLoading(false))
-    return () => controller.abort()
-  }, [credential, value, workflowId])
-
-  const handleSelectTeam = (team: LinearTeamInfo) => {
-    onChange(team.id, team)
-    setOpen(false)
+  const handleChange = (selectedValue: string, metadata?: any) => {
+    const teamInfo = metadata as LinearTeamInfo | undefined
+    onChange(selectedValue, teamInfo)
   }
 
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-  }
+  const emptyMessage = !credential
+    ? 'Please configure Linear credentials.'
+    : error
+      ? error
+      : 'No teams available for this Linear account.'
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant='outline'
-          role='combobox'
-          aria-expanded={open}
-          className='w-full justify-between'
-          disabled={disabled || !credential}
-        >
-          {cachedTeamName ? (
-            <div className='flex items-center gap-2 overflow-hidden'>
-              <LinearIcon className='h-4 w-4' />
-              <span className='truncate font-normal'>{cachedTeamName}</span>
-            </div>
-          ) : (
-            <div className='flex items-center gap-2'>
-              <LinearIcon className='h-4 w-4' />
-              <span className='text-muted-foreground'>{label}</span>
-            </div>
-          )}
-          <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className='w-[300px] p-0' align='start'>
-        <Command>
-          <CommandInput placeholder='Search teams...' />
-          <CommandList>
-            <CommandEmpty>
-              {loading ? (
-                <div className='flex items-center justify-center p-4'>
-                  <RefreshCw className='h-4 w-4 animate-spin' />
-                  <span className='ml-2'>Loading teams...</span>
-                </div>
-              ) : error ? (
-                <div className='p-4 text-center'>
-                  <p className='text-destructive text-sm'>{error}</p>
-                </div>
-              ) : !credential ? (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>Missing credentials</p>
-                  <p className='text-muted-foreground text-xs'>
-                    Please configure Linear credentials.
-                  </p>
-                </div>
-              ) : (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>No teams found</p>
-                  <p className='text-muted-foreground text-xs'>
-                    No teams available for this Linear account.
-                  </p>
-                </div>
-              )}
-            </CommandEmpty>
-
-            {teams.length > 0 && (
-              <CommandGroup>
-                <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Teams</div>
-                {teams.map((team) => (
-                  <CommandItem
-                    key={team.id}
-                    value={`team-${team.id}-${team.name}`}
-                    onSelect={() => handleSelectTeam(team)}
-                    className='cursor-pointer'
-                  >
-                    <div className='flex items-center gap-2 overflow-hidden'>
-                      <LinearIcon className='h-4 w-4' />
-                      <span className='truncate font-normal'>{team.name}</span>
-                    </div>
-                    {team.id === value && <Check className='ml-auto h-4 w-4' />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Combobox
+      options={options}
+      value={value}
+      onChange={handleChange}
+      placeholder={label}
+      disabled={disabled || !credential}
+      editable={true}
+      isLoading={isLoading}
+      error={error}
+      getDisplayName={getDisplayName}
+      icon={LinearIcon}
+      emptyMessage={emptyMessage}
+    />
   )
 }

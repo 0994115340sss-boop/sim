@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { client } from '@/lib/auth-client'
 import { createLogger } from '@/lib/logs/console/logger'
 import { OAUTH_PROVIDERS, type OAuthServiceConfig } from '@/lib/oauth/oauth'
+import { credentialsKeys } from './credentials'
 
 const logger = createLogger('OAuthConnectionsQuery')
 
@@ -143,7 +144,7 @@ export function useConnectOAuthService() {
       // Handle Trello specially
       if (providerId === 'trello') {
         window.location.href = '/api/auth/trello/authorize'
-        return { success: true }
+        return { success: true, providerId }
       }
 
       await client.oauth2.link({
@@ -151,11 +152,14 @@ export function useConnectOAuthService() {
         callbackURL,
       })
 
-      return { success: true }
+      return { success: true, providerId }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate connections to refetch
       queryClient.invalidateQueries({ queryKey: oauthConnectionsKeys.connections() })
+
+      // Invalidate credentials for this provider to refresh credential lists
+      queryClient.invalidateQueries({ queryKey: credentialsKeys.list(data.providerId) })
     },
     onError: (error) => {
       logger.error('OAuth connection error:', error)
@@ -193,11 +197,12 @@ export function useDisconnectOAuthService() {
         throw new Error('Failed to disconnect service')
       }
 
-      return response.json()
+      return { data: await response.json(), providerId }
     },
-    onMutate: async ({ serviceId, accountId }) => {
+    onMutate: async ({ serviceId, accountId, providerId }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: oauthConnectionsKeys.connections() })
+      await queryClient.cancelQueries({ queryKey: credentialsKeys.list(providerId) })
 
       // Snapshot the previous value
       const previousServices = queryClient.getQueryData<ServiceInfo[]>(
@@ -222,7 +227,7 @@ export function useDisconnectOAuthService() {
         )
       }
 
-      return { previousServices }
+      return { previousServices, providerId }
     },
     onError: (_err, _variables, context) => {
       // Rollback on error
@@ -231,9 +236,21 @@ export function useDisconnectOAuthService() {
       }
       logger.error('Failed to disconnect service')
     },
-    onSettled: () => {
+    onSettled: (_data, _error, _variables, context) => {
       // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: oauthConnectionsKeys.connections() })
+
+      // Invalidate credentials for this provider
+      if (context?.providerId) {
+        queryClient.invalidateQueries({ queryKey: credentialsKeys.list(context.providerId) })
+
+        // Emit event to notify components (including React Query components that listen directly)
+        window.dispatchEvent(
+          new CustomEvent('credential-disconnected', {
+            detail: { providerId: context.providerId },
+          })
+        )
+      }
     },
   })
 }

@@ -1,16 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Check, ChevronDown, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { Combobox, type ComboboxOption } from '@/components/emcn'
 import { LinearIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useResourceList } from '@/hooks/queries/resources'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
 export interface LinearProjectInfo {
@@ -26,6 +17,7 @@ interface LinearProjectSelectorProps {
   label?: string
   disabled?: boolean
   workflowId?: string
+  isForeignCredential?: boolean
 }
 
 export function LinearProjectSelector({
@@ -36,161 +28,98 @@ export function LinearProjectSelector({
   label = 'Select Linear project',
   disabled = false,
   workflowId,
+  isForeignCredential = false,
 }: LinearProjectSelectorProps) {
-  const [projects, setProjects] = useState<LinearProjectInfo[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  // Fetch projects using the generic hook
+  const {
+    data: projects = [],
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useResourceList<LinearProjectInfo>({
+    resourceType: 'projects',
+    credential,
+    endpoint: '/api/tools/linear/projects',
+    params: { teamId, workflowId },
+    enabled: !!credential && !!teamId,
+  })
 
   // Get cached display name
-  const cachedProjectName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        if (!credential || !value) return null
-        return state.cache.projects[`linear-${credential}`]?.[value] || null
-      },
-      [credential, value]
-    )
+  const getDisplayName = useCallback(
+    (projectId: string) => {
+      if (isForeignCredential) return 'Saved by collaborator'
+      if (!credential || !projectId) return null
+      return (
+        useDisplayNamesStore.getState().cache.projects[`linear-${credential}`]?.[projectId] || null
+      )
+    },
+    [credential, isForeignCredential]
   )
 
+  // Cache project names in display names store when data changes
   useEffect(() => {
-    if (!credential || !teamId) return
-    const controller = new AbortController()
-    setLoading(true)
-    setError(null)
+    if (credential && projects.length > 0) {
+      const projectMap = projects.reduce((acc: Record<string, string>, proj: LinearProjectInfo) => {
+        acc[proj.id] = proj.name
+        return acc
+      }, {})
+      useDisplayNamesStore
+        .getState()
+        .setDisplayNames('projects', `linear-${credential}`, projectMap)
+    }
+  }, [credential, projects])
 
-    fetch('/api/tools/linear/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential, teamId, workflowId }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorText = await res.text()
-          throw new Error(`HTTP error! status: ${res.status} - ${errorText}`)
-        }
-        return res.json()
-      })
-      .then((data) => {
-        if (data.error) {
-          setError(data.error)
-          setProjects([])
-        } else {
-          setProjects(data.projects)
+  // Get cached project name to check if we need eager fetching
+  const cachedProjectName = useMemo(() => {
+    if (!credential || !value) return null
+    return useDisplayNamesStore.getState().cache.projects[`linear-${credential}`]?.[value] || null
+  }, [credential, value])
 
-          // Cache project names in display names store
-          if (credential && data.projects) {
-            const projectMap = data.projects.reduce(
-              (acc: Record<string, string>, proj: LinearProjectInfo) => {
-                acc[proj.id] = proj.name
-                return acc
-              },
-              {}
-            )
-            useDisplayNamesStore
-              .getState()
-              .setDisplayNames('projects', `linear-${credential}`, projectMap)
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name === 'AbortError') return
-        setError(err.message)
-        setProjects([])
-      })
-      .finally(() => setLoading(false))
-    return () => controller.abort()
-  }, [credential, teamId, value, workflowId])
+  // Eager caching: If we have a value but no cached name, fetch projects immediately
+  // This fixes the bug where project names show "-" on page refresh until user clicks the block
+  useEffect(() => {
+    if (value && credential && teamId && !cachedProjectName && !isLoading) {
+      refetch()
+    }
+  }, [value, credential, teamId, cachedProjectName, isLoading, refetch])
 
-  const handleSelectProject = (project: LinearProjectInfo) => {
-    onChange(project.id, project)
-    setOpen(false)
+  // Convert projects to combobox options
+  const options = useMemo<ComboboxOption[]>(() => {
+    return projects.map((project: LinearProjectInfo) => ({
+      label: project.name,
+      value: project.id,
+      icon: LinearIcon,
+      metadata: project,
+    }))
+  }, [projects])
+
+  const handleChange = (selectedValue: string, metadata?: any) => {
+    const projectInfo = metadata as LinearProjectInfo | undefined
+    onChange(selectedValue, projectInfo)
   }
 
-  const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-  }
+  const error = queryError ? String(queryError) : null
+
+  const emptyMessage =
+    !credential || !teamId
+      ? 'Please configure Linear credentials and select a team.'
+      : error
+        ? error
+        : 'No projects available for the selected team.'
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant='outline'
-          role='combobox'
-          aria-expanded={open}
-          className='w-full justify-between'
-          disabled={disabled || !credential || !teamId}
-        >
-          {cachedProjectName ? (
-            <div className='flex items-center gap-2 overflow-hidden'>
-              <LinearIcon className='h-4 w-4' />
-              <span className='truncate font-normal'>{cachedProjectName}</span>
-            </div>
-          ) : (
-            <div className='flex items-center gap-2'>
-              <LinearIcon className='h-4 w-4' />
-              <span className='text-muted-foreground'>{label}</span>
-            </div>
-          )}
-          <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className='w-[300px] p-0' align='start'>
-        <Command>
-          <CommandInput placeholder='Search projects...' />
-          <CommandList>
-            <CommandEmpty>
-              {loading ? (
-                <div className='flex items-center justify-center p-4'>
-                  <RefreshCw className='h-4 w-4 animate-spin' />
-                  <span className='ml-2'>Loading projects...</span>
-                </div>
-              ) : error ? (
-                <div className='p-4 text-center'>
-                  <p className='text-destructive text-sm'>{error}</p>
-                </div>
-              ) : !credential || !teamId ? (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>Missing credentials or team</p>
-                  <p className='text-muted-foreground text-xs'>
-                    Please configure Linear credentials and select a team.
-                  </p>
-                </div>
-              ) : (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>No projects found</p>
-                  <p className='text-muted-foreground text-xs'>
-                    No projects available for the selected team.
-                  </p>
-                </div>
-              )}
-            </CommandEmpty>
-
-            {projects.length > 0 && (
-              <CommandGroup>
-                <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                  Projects
-                </div>
-                {projects.map((project) => (
-                  <CommandItem
-                    key={project.id}
-                    value={`project-${project.id}-${project.name}`}
-                    onSelect={() => handleSelectProject(project)}
-                    className='cursor-pointer'
-                  >
-                    <div className='flex items-center gap-2 overflow-hidden'>
-                      <LinearIcon className='h-4 w-4' />
-                      <span className='truncate font-normal'>{project.name}</span>
-                    </div>
-                    {project.id === value && <Check className='ml-auto h-4 w-4' />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Combobox
+      options={options}
+      value={value}
+      onChange={handleChange}
+      placeholder={label}
+      disabled={disabled || !credential || !teamId}
+      editable={true}
+      isLoading={isLoading}
+      error={error}
+      getDisplayName={getDisplayName}
+      icon={LinearIcon}
+      emptyMessage={emptyMessage}
+    />
   )
 }

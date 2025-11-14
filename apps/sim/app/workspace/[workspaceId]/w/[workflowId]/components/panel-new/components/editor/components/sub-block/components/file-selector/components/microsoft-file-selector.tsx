@@ -1,18 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { Button } from '@/components/emcn/components/button/button'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { MicrosoftExcelIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
@@ -78,7 +70,6 @@ export function MicrosoftFileSelector({
   credentialId,
   isForeignCredential = false,
 }: MicrosoftFileSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [selectedCredentialId, setSelectedCredentialId] = useState<string>(credentialId || '')
   const [selectedFileId, setSelectedFileId] = useState(value)
@@ -500,8 +491,6 @@ export function MicrosoftFileSelector({
     setSelectedFile(taskAsFileInfo)
     onChange(taskId, taskAsFileInfo)
     onFileInfoChange?.(taskAsFileInfo)
-    setOpen(false)
-    setSearchQuery('')
   }
 
   // Keep internal selectedFileId in sync with the value prop (do not clear selectedFile; we'll resolve new metadata below)
@@ -544,16 +533,12 @@ export function MicrosoftFileSelector({
     setSelectedFile(file)
     onChange(file.id, file)
     onFileInfoChange?.(file)
-    setOpen(false)
-    setSearchQuery('')
   }
 
   // Handle adding a new credential
   const handleAddCredential = () => {
     // Show the OAuth modal
     setShowOAuthModal(true)
-    setOpen(false)
-    setSearchQuery('') // Clear search when closing
   }
 
   // Clear selection
@@ -716,14 +701,47 @@ export function MicrosoftFileSelector({
   }
 
   // Filter tasks based on search query for planner
-  const filteredTasks: SelectableItem[] =
-    serviceId === 'microsoft-planner'
+  const filteredTasks: SelectableItem[] = useMemo(() => {
+    return serviceId === 'microsoft-planner'
       ? plannerTasks.filter((task) => {
           const title = task.title || ''
           const query = searchQuery || ''
           return title.toLowerCase().includes(query.toLowerCase())
         })
       : availableFiles
+  }, [serviceId, plannerTasks, searchQuery, availableFiles])
+
+  // Convert files/tasks to ComboboxOption format
+  const fileOptions: ComboboxOption[] = useMemo(() => {
+    return filteredTasks.map((item) => {
+      const isPlanner = serviceId === 'microsoft-planner'
+      const isPlannerTask = isPlanner && 'title' in item
+      const plannerTask = item as PlannerTask
+      const fileInfo = item as MicrosoftFileInfo
+
+      const displayName = isPlannerTask ? plannerTask.title : fileInfo.name
+      const dateField = isPlannerTask ? plannerTask.createdDateTime : fileInfo.createdTime
+
+      return {
+        label: displayName,
+        value: item.id,
+        subtitle: dateField ? `Modified ${new Date(dateField).toLocaleDateString()}` : undefined,
+        icon: () =>
+          getFileIcon(
+            isPlannerTask
+              ? {
+                  ...fileInfo,
+                  id: plannerTask.id || '',
+                  name: plannerTask.title,
+                  mimeType: 'planner/task',
+                }
+              : fileInfo,
+            'sm'
+          ),
+        metadata: item,
+      }
+    })
+  }, [filteredTasks, serviceId])
 
   const canShowPreview = !!(
     showPreview &&
@@ -732,197 +750,154 @@ export function MicrosoftFileSelector({
     selectedFile.id === selectedFileId
   )
 
+  // Handle file/task selection
+  const handleSelect = (value: string, metadata?: any) => {
+    const item = metadata as SelectableItem
+    if (!item) return
+
+    const isPlanner = serviceId === 'microsoft-planner'
+    const isPlannerTask = isPlanner && 'title' in item
+
+    if (isPlannerTask) {
+      handleTaskSelect(item as PlannerTask)
+    } else {
+      handleFileSelect(item as MicrosoftFileInfo)
+    }
+  }
+
+  // Get display name from cache
+  const getDisplayNameFromCache = useCallback(
+    (fileId: string) => {
+      const effectiveCredentialId = credentialId || selectedCredentialId
+      if (!effectiveCredentialId || !fileId) return null
+      return cachedFileName
+    },
+    [credentialId, selectedCredentialId, cachedFileName]
+  )
+
+  // Get provider icon component
+  const ProviderIcon = useMemo(() => {
+    return () => getProviderIcon(provider)
+  }, [provider])
+
+  // Render account selector above files when multiple accounts exist
+  const renderAbove = useMemo(() => {
+    if (credentials.length <= 1) return null
+
+    return (
+      <div className='border-b'>
+        <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>Switch Account</div>
+        <div className='space-y-[2px] pb-[4px]'>
+          {credentials.map((cred) => (
+            <button
+              key={cred.id}
+              onClick={() => setSelectedCredentialId(cred.id)}
+              className='flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 text-left text-sm hover:bg-[var(--surface-11)] dark:hover:bg-[var(--surface-12)]'
+            >
+              <div className='flex flex-1 items-center gap-2'>
+                {getProviderIcon(cred.provider)}
+                <span className='font-normal'>{cred.name}</span>
+              </div>
+              {cred.id === selectedCredentialId && <Check className='h-4 w-4' />}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }, [credentials, selectedCredentialId, provider])
+
+  // Render footer with "Connect account" button
+  const renderFooter = useMemo(() => {
+    if (credentials.length > 0) return null
+
+    return (
+      <Button variant='ghost' className='w-full justify-start gap-2' onClick={handleAddCredential}>
+        {getProviderIcon(provider)}
+        <span>Connect {getProviderName(provider)} account</span>
+      </Button>
+    )
+  }, [credentials.length, provider])
+
+  // Render empty state
+  const renderEmpty = useMemo(() => {
+    if (isLoading || isLoadingFiles || isLoadingTasks) {
+      return (
+        <div className='flex items-center justify-center py-4'>
+          <RefreshCw className='h-4 w-4 animate-spin' />
+          <span className='ml-2'>Loading...</span>
+        </div>
+      )
+    }
+
+    if (credentials.length === 0) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='font-medium text-sm'>No accounts connected.</p>
+          <p className='text-muted-foreground text-xs'>
+            Connect a {getProviderName(provider)} account to continue.
+          </p>
+        </div>
+      )
+    }
+
+    if (serviceId === 'microsoft-planner' && !planId) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='font-medium text-sm'>Plan ID required.</p>
+          <p className='text-muted-foreground text-xs'>
+            Please enter a Plan ID first to see tasks.
+          </p>
+        </div>
+      )
+    }
+
+    if (filteredTasks.length === 0) {
+      return (
+        <div className='p-4 text-center'>
+          <p className='font-medium text-sm'>{getEmptyStateText().title}</p>
+          <p className='text-muted-foreground text-xs'>{getEmptyStateText().description}</p>
+        </div>
+      )
+    }
+
+    return null
+  }, [
+    isLoading,
+    isLoadingFiles,
+    isLoadingTasks,
+    credentials.length,
+    serviceId,
+    planId,
+    filteredTasks.length,
+    provider,
+  ])
+
+  // Handle open change
+  const handleOpenChange = (isOpen: boolean) => {
+    // Note: We don't clear searchQuery here to allow users to continue
+    // their search if they reopen the dropdown
+  }
+
   return (
     <>
       <div className='space-y-2'>
-        <Popover
-          open={open}
-          onOpenChange={(isOpen) => {
-            setOpen(isOpen)
-            if (!isOpen) {
-              setSearchQuery('')
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='h-10 w-full min-w-0 justify-between'
-              disabled={
-                disabled || isForeignCredential || (serviceId === 'microsoft-planner' && !planId)
-              }
-            >
-              <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-                {cachedFileName ? (
-                  <>
-                    {getProviderIcon(provider)}
-                    <span className='truncate font-normal'>{cachedFileName}</span>
-                  </>
-                ) : (
-                  <>
-                    {getProviderIcon(provider)}
-                    <span className='truncate text-muted-foreground'>{label}</span>
-                  </>
-                )}
-              </div>
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          {!isForeignCredential && (
-            <PopoverContent className='w-[300px] p-0' align='start'>
-              {/* Current account indicator */}
-              {selectedCredentialId && credentials.length > 0 && (
-                <div className='flex items-center justify-between border-b px-3 py-2'>
-                  <div className='flex items-center gap-2'>
-                    {getProviderIcon(provider)}
-                    <span className='text-muted-foreground text-xs'>
-                      {credentials.find((cred) => cred.id === selectedCredentialId)?.name ||
-                        'Unknown'}
-                    </span>
-                  </div>
-                  {credentials.length > 1 && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => setOpen(true)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              <Command>
-                <CommandInput placeholder={getSearchPlaceholder()} onValueChange={handleSearch} />
-                <CommandList>
-                  <CommandEmpty>
-                    {isLoading || isLoadingFiles || isLoadingTasks ? (
-                      <div className='flex items-center justify-center p-4'>
-                        <RefreshCw className='h-4 w-4 animate-spin' />
-                        <span className='ml-2'>Loading...</span>
-                      </div>
-                    ) : credentials.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No accounts connected.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Connect a {getProviderName(provider)} account to continue.
-                        </p>
-                      </div>
-                    ) : serviceId === 'microsoft-planner' && !planId ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>Plan ID required.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Please enter a Plan ID first to see tasks.
-                        </p>
-                      </div>
-                    ) : filteredTasks.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>{getEmptyStateText().title}</p>
-                        <p className='text-muted-foreground text-xs'>
-                          {getEmptyStateText().description}
-                        </p>
-                      </div>
-                    ) : null}
-                  </CommandEmpty>
-
-                  {/* Account selection - only show if we have multiple accounts */}
-                  {credentials.length > 1 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Switch Account
-                      </div>
-                      {credentials.map((cred) => (
-                        <CommandItem
-                          key={cred.id}
-                          value={`account-${cred.id}`}
-                          onSelect={() => setSelectedCredentialId(cred.id)}
-                        >
-                          <div className='flex items-center gap-2'>
-                            {getProviderIcon(cred.provider)}
-                            <span className='font-normal'>{cred.name}</span>
-                          </div>
-                          {cred.id === selectedCredentialId && (
-                            <Check className='ml-auto h-4 w-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Available files/tasks - only show if we have credentials and items */}
-                  {credentials.length > 0 && selectedCredentialId && filteredTasks.length > 0 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        {getFileTypeTitleCase()}
-                      </div>
-                      {filteredTasks.map((item) => {
-                        const isPlanner = serviceId === 'microsoft-planner'
-                        const isPlannerTask = isPlanner && 'title' in item
-                        const plannerTask = item as PlannerTask
-                        const fileInfo = item as MicrosoftFileInfo
-
-                        const displayName = isPlannerTask ? plannerTask.title : fileInfo.name
-                        const dateField = isPlannerTask
-                          ? plannerTask.createdDateTime
-                          : fileInfo.createdTime
-
-                        return (
-                          <CommandItem
-                            key={item.id}
-                            value={`file-${item.id}-${displayName}`}
-                            onSelect={() =>
-                              isPlannerTask
-                                ? handleTaskSelect(plannerTask)
-                                : handleFileSelect(fileInfo)
-                            }
-                          >
-                            <div className='flex items-center gap-2 overflow-hidden'>
-                              {getFileIcon(
-                                isPlannerTask
-                                  ? {
-                                      ...fileInfo,
-                                      id: plannerTask.id || '',
-                                      name: plannerTask.title,
-                                      mimeType: 'planner/task',
-                                    }
-                                  : fileInfo,
-                                'sm'
-                              )}
-                              <div className='min-w-0 flex-1'>
-                                <span className='truncate font-normal'>{displayName}</span>
-                                {dateField && (
-                                  <div className='text-muted-foreground text-xs'>
-                                    Modified {new Date(dateField).toLocaleDateString()}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {item.id === selectedFileId && <Check className='ml-auto h-4 w-4' />}
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  )}
-
-                  {/* Connect account option - only show if no credentials */}
-                  {credentials.length === 0 && (
-                    <CommandGroup>
-                      <CommandItem onSelect={handleAddCredential}>
-                        <div className='flex items-center gap-2 text-foreground'>
-                          {getProviderIcon(provider)}
-                          <span>Connect {getProviderName(provider)} account</span>
-                        </div>
-                      </CommandItem>
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          )}
-        </Popover>
+        <Combobox
+          options={fileOptions}
+          value={selectedFileId}
+          onChange={handleSelect}
+          placeholder={label}
+          disabled={
+            disabled || isForeignCredential || (serviceId === 'microsoft-planner' && !planId)
+          }
+          editable={true}
+          isLoading={isLoading || isLoadingFiles || isLoadingTasks}
+          onOpenChange={handleOpenChange}
+          getDisplayName={getDisplayNameFromCache}
+          renderAbove={renderAbove}
+          renderFooter={renderFooter}
+          renderEmpty={renderEmpty}
+          onSearch={handleSearch}
+        />
 
         {canShowPreview && (
           <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>

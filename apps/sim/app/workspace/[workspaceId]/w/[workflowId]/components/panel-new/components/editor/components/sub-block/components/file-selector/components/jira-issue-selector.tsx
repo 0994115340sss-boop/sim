@@ -1,18 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ExternalLink, RefreshCw, X } from 'lucide-react'
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { ExternalLink, X } from 'lucide-react'
+import { Combobox, type ComboboxOption } from '@/components/emcn'
 import { JiraIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   type Credential,
@@ -21,18 +14,23 @@ import {
   type OAuthProvider,
 } from '@/lib/oauth'
 import { OAuthRequiredModal } from '@/app/workspace/[workspaceId]/w/[workflowId]/components/panel-new/components/editor/components/sub-block/components/credential-selector/components/oauth-required-modal'
+// Note: Jira uses custom query implementation due to special requirements:
+// - Requires fetching access token via /api/auth/oauth/token first
+// - Uses GET with query params (not standard POST with body)
+// - Returns special "sections" structure
+// - Needs cloudId management across requests
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
 const logger = createLogger('JiraIssueSelector')
 
+// Jira issue information structure
 export interface JiraIssueInfo {
   id: string
   name: string
-  mimeType: string
+  mimeType?: string
+  url?: string
   webViewLink?: string
   modifiedTime?: string
-  spaceId?: string
-  url?: string
 }
 
 interface JiraIssueSelectorProps {
@@ -68,66 +66,222 @@ export function JiraIssueSelector({
   isForeignCredential = false,
   workflowId,
 }: JiraIssueSelectorProps) {
-  const [open, setOpen] = useState(false)
   const [credentials, setCredentials] = useState<Credential[]>([])
-  const [issues, setIssues] = useState<JiraIssueInfo[]>([])
   const [selectedCredentialId, setSelectedCredentialId] = useState<string>(credentialId || '')
   const [selectedIssueId, setSelectedIssueId] = useState(value)
-  const [selectedIssue, setSelectedIssue] = useState<JiraIssueInfo | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const [showOAuthModal, setShowOAuthModal] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const [cloudId, setCloudId] = useState<string | null>(null)
+  const [credentialsLoading, setCredentialsLoading] = useState(false)
 
-  // Get cached display name
-  const cachedIssueName = useDisplayNamesStore(
-    useCallback(
-      (state) => {
-        const effectiveCredentialId = credentialId || selectedCredentialId
-        if (!effectiveCredentialId || !value) return null
-        return state.cache.files[effectiveCredentialId]?.[value] || null
-      },
-      [credentialId, selectedCredentialId, value]
-    )
+  // Validate domain format
+  const trimmedDomain = domain?.trim().toLowerCase()
+  const isValidDomain = trimmedDomain?.includes('.')
+
+  // Only fetch if we have a valid domain and either a project or search query
+  const shouldFetch = isValidDomain && (!!projectId || !!searchQuery)
+
+  // Fetch access token for Jira API calls
+  const { data: accessToken, isLoading: tokenLoading } = useQuery({
+    queryKey: selectedCredentialId
+      ? ['jira-access-token', selectedCredentialId, workflowId]
+      : ['jira-access-token', 'empty'],
+    queryFn: async () => {
+      if (!selectedCredentialId) return null
+
+      const tokenResponse = await fetch('/api/auth/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          credentialId: selectedCredentialId,
+          workflowId,
+        }),
+      })
+
+      if (!tokenResponse.ok) {
+        const errorData = await tokenResponse.json()
+        logger.error('Access token error:', errorData)
+        throw new Error('Authentication failed. Please reconnect your Jira account.')
+      }
+
+      const tokenData = await tokenResponse.json()
+      const token = tokenData.accessToken
+
+      if (!token) {
+        logger.error('No access token returned')
+        throw new Error('Authentication failed. Please reconnect your Jira account.')
+      }
+
+      return token
+    },
+    enabled: !!selectedCredentialId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - tokens are valid for longer
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
+
+  // Fetch issues using custom query (Jira requires special handling)
+  const {
+    data: issuesResponse,
+    isLoading: issuesLoading,
+    error: issuesError,
+    refetch: refetchIssues,
+  } = useQuery({
+    queryKey:
+      accessToken && domain
+        ? ['jira-issues', accessToken, domain, { projectId, searchQuery, cloudId }]
+        : ['jira-issues', 'empty'],
+    queryFn: async () => {
+      if (!accessToken || !domain || !isValidDomain) return { issues: [], cloudId: null }
+
+      // If no search query and no project, return empty
+      if (!searchQuery && !projectId) {
+        return { issues: [], cloudId: null }
+      }
+
+      // Build query parameters for the issues endpoint
+      const queryParams = new URLSearchParams({
+        domain,
+        accessToken,
+        ...(projectId && { projectId }),
+        ...(searchQuery && { query: searchQuery }),
+        ...(cloudId && { cloudId }),
+      })
+
+      const response = await fetch(`/api/tools/jira/issues?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        logger.error('Jira API error:', errorData)
+        throw new Error(errorData.error || 'Failed to fetch issues')
+      }
+
+      const data = await response.json()
+
+      // Update cloudId state for subsequent queries
+      if (data.cloudId) {
+        setCloudId(data.cloudId)
+      }
+
+      // Process the issue picker results
+      let foundIssues: JiraIssueInfo[] = []
+
+      // Handle the sections returned by the issue picker API
+      if (data.sections) {
+        // Combine issues from all sections
+        data.sections.forEach((section: any) => {
+          if (section.issues && section.issues.length > 0) {
+            const sectionIssues = section.issues.map((issue: any) => ({
+              id: issue.key,
+              name: issue.summary || issue.summaryText || issue.key,
+              mimeType: 'jira/issue',
+              url: `https://${domain}/browse/${issue.key}`,
+              webViewLink: `https://${domain}/browse/${issue.key}`,
+            }))
+            foundIssues = [...foundIssues, ...sectionIssues]
+          }
+        })
+      }
+
+      logger.info(`Received ${foundIssues.length} issues from API`)
+
+      return {
+        issues: foundIssues,
+        cloudId: data.cloudId || null,
+      }
+    },
+    enabled: shouldFetch && !!accessToken,
+    staleTime: 30 * 1000, // 30 seconds - issues change more frequently
+    retry: false, // Don't retry on auth errors
+    placeholderData: keepPreviousData,
+  })
+
+  const issues = (issuesResponse?.issues ?? []) as JiraIssueInfo[]
+  const isLoading = issuesLoading || credentialsLoading || tokenLoading
+  const error = issuesError ? (issuesError as Error).message : null
+
+  // Fetch metadata for the selected issue (if value exists and not in issues list)
+  const shouldFetchMetadata = !!value && !!accessToken && issues.length === 0
+  const { data: issueMetadata } = useQuery({
+    queryKey:
+      value && accessToken && domain
+        ? ['jira-issue-detail', value, accessToken, domain]
+        : ['jira-issues', 'empty-detail'],
+    queryFn: async () => {
+      if (!value || !accessToken || !domain || !isValidDomain) return null
+
+      // Use the access token to fetch the issue info
+      const response = await fetch('/api/tools/jira/issue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain,
+          accessToken,
+          issueId: value,
+          cloudId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        logger.error('Failed to fetch issue info:', errorData)
+        return null
+      }
+
+      const data = await response.json()
+
+      if (data.issue) {
+        logger.info('Successfully fetched issue:', data.issue.name)
+        // Update cloudId state
+        if (data.cloudId) {
+          setCloudId(data.cloudId)
+        }
+        return {
+          issue: data.issue as JiraIssueInfo,
+          cloudId: data.cloudId || null,
+        }
+      }
+
+      logger.warn('No issue data received in response')
+      return null
+    },
+    enabled: shouldFetchMetadata,
+    staleTime: 60 * 1000, // 1 minute
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
+
+  const selectedIssue = useMemo(() => {
+    if (!value) return null
+    // Try to find in issues list first
+    const found = issues.find((issue: JiraIssueInfo) => issue.id === value)
+    if (found) return found
+    // Fall back to metadata
+    return issueMetadata?.issue ?? null
+  }, [value, issues, issueMetadata])
+
+  // Get display name callback for Combobox
+  const getDisplayName = useCallback(
+    (issueId: string) => {
+      if (isForeignCredential) return 'Saved by collaborator'
+      const effectiveCredentialId = credentialId || selectedCredentialId
+      if (!effectiveCredentialId || !issueId) return null
+      return (
+        useDisplayNamesStore.getState().cache.files[`jira-${effectiveCredentialId}`]?.[issueId] ||
+        null
+      )
+    },
+    [credentialId, selectedCredentialId, isForeignCredential]
   )
-
-  // Keep local credential state in sync with persisted credentialId prop
-  useEffect(() => {
-    if (credentialId && credentialId !== selectedCredentialId) {
-      setSelectedCredentialId(credentialId)
-    } else if (!credentialId && selectedCredentialId) {
-      setSelectedCredentialId('')
-    }
-  }, [credentialId, selectedCredentialId])
-
-  // Handle search with debounce
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const handleSearch = (value: string) => {
-    // Clear any existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    // Set a new timeout
-    searchTimeoutRef.current = setTimeout(() => {
-      if (value.length >= 1) {
-        // Changed from > 2 to >= 1 to be more responsive
-        fetchIssues(value)
-      } else {
-        setIssues([]) // Clear issues if search is empty
-      }
-    }, 500) // 500ms debounce
-  }
-
-  // Clean up the timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [])
 
   // Determine the appropriate service ID based on provider and scopes
   const getServiceId = (): string => {
@@ -141,10 +295,66 @@ export function JiraIssueSelector({
     return getProviderIdFromServiceId(effectiveServiceId)
   }, [serviceId, provider, requiredScopes])
 
+  // Cache issue names in display names store
+  useEffect(() => {
+    if (selectedCredentialId && issues.length > 0) {
+      const issueMap = issues.reduce((acc: Record<string, string>, issue: JiraIssueInfo) => {
+        acc[issue.id] = issue.name
+        return acc
+      }, {})
+      useDisplayNamesStore
+        .getState()
+        .setDisplayNames('files', `jira-${selectedCredentialId}`, issueMap)
+    }
+  }, [selectedCredentialId, issues])
+
+  // Get cached issue name to check if we need eager fetching
+  const cachedIssueName = useMemo(() => {
+    const effectiveCredentialId = credentialId || selectedCredentialId
+    if (!effectiveCredentialId || !value) return null
+    return (
+      useDisplayNamesStore.getState().cache.files[`jira-${effectiveCredentialId}`]?.[value] || null
+    )
+  }, [credentialId, selectedCredentialId, value])
+
+  // Eager caching: If we have a value but no cached name, fetch issues immediately
+  // This fixes the bug where issue names show "-" on page refresh until user clicks the block
+  useEffect(() => {
+    if (
+      value &&
+      selectedCredentialId &&
+      domain &&
+      isValidDomain &&
+      !cachedIssueName &&
+      !isLoading &&
+      !isForeignCredential &&
+      accessToken
+    ) {
+      refetchIssues()
+    }
+  }, [
+    value,
+    selectedCredentialId,
+    domain,
+    isValidDomain,
+    cachedIssueName,
+    isLoading,
+    isForeignCredential,
+    accessToken,
+    refetchIssues,
+  ])
+
+  // Notify parent when selected issue changes
+  useEffect(() => {
+    if (selectedIssue) {
+      onIssueInfoChange?.(selectedIssue)
+    }
+  }, [selectedIssue, onIssueInfoChange])
+
   // Fetch available credentials for this provider
   const fetchCredentials = useCallback(async () => {
     if (!providerId) return
-    setIsLoading(true)
+    setCredentialsLoading(true)
     try {
       const response = await fetch(`/api/auth/oauth/credentials?provider=${providerId}`)
 
@@ -155,504 +365,187 @@ export function JiraIssueSelector({
     } catch (error) {
       logger.error('Error fetching credentials:', error)
     } finally {
-      setIsLoading(false)
+      setCredentialsLoading(false)
     }
   }, [providerId])
 
-  // Fetch issue info when we have a selected issue ID
-  const fetchIssueInfo = useCallback(
-    async (issueId: string) => {
-      // Validate domain format
-      const trimmedDomain = domain.trim().toLowerCase()
-      if (!trimmedDomain.includes('.')) {
-        setError(
-          'Invalid domain format. Please provide the full domain (e.g., your-site.atlassian.net)'
-        )
-        return
-      }
-
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        // Get the access token from the selected credential
-        const tokenResponse = await fetch('/api/auth/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            credentialId: selectedCredentialId,
-            workflowId,
-          }),
-        })
-
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json()
-          throw new Error(errorData.error || 'Failed to get access token')
-        }
-
-        const tokenData = await tokenResponse.json()
-        const accessToken = tokenData.accessToken
-
-        if (!accessToken) {
-          throw new Error('No access token received')
-        }
-
-        // Use the access token to fetch the issue info
-        const response = await fetch('/api/tools/jira/issue', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            domain,
-            accessToken,
-            issueId,
-            cloudId,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          logger.error('Failed to fetch issue info:', errorData)
-          throw new Error(errorData.error || 'Failed to fetch issue info')
-        }
-
-        const data = await response.json()
-        if (data.cloudId) {
-          logger.info('Using cloud ID:', data.cloudId)
-          setCloudId(data.cloudId)
-        }
-
-        if (data.issue) {
-          logger.info('Successfully fetched issue:', data.issue.name)
-          setSelectedIssue(data.issue)
-          onIssueInfoChange?.(data.issue)
-        } else {
-          logger.warn('No issue data received in response')
-          setSelectedIssue(null)
-          onIssueInfoChange?.(null)
-        }
-      } catch (error) {
-        logger.error('Error fetching issue info:', error)
-        setError((error as Error).message)
-        onIssueInfoChange?.(null)
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [selectedCredentialId, domain, onIssueInfoChange, cloudId]
-  )
-
-  // Fetch issues from Jira
-  const fetchIssues = useCallback(
-    async (searchQuery?: string) => {
-      if (!selectedCredentialId || !domain) return
-      // If no search query is provided, require a projectId before fetching
-      if (!searchQuery && !projectId) {
-        setIssues([])
-        return
-      }
-
-      // Validate domain format
-      const trimmedDomain = domain.trim().toLowerCase()
-      if (!trimmedDomain.includes('.')) {
-        setError(
-          'Invalid domain format. Please provide the full domain (e.g., your-site.atlassian.net)'
-        )
-        setIssues([])
-        setIsLoading(false)
-        return
-      }
-
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        // Get the access token from the selected credential
-        const tokenResponse = await fetch('/api/auth/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            credentialId: selectedCredentialId,
-            workflowId,
-          }),
-        })
-
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json()
-          logger.error('Access token error:', errorData)
-
-          // If there's a token error, we might need to reconnect the account
-          setError('Authentication failed. Please reconnect your Jira account.')
-          setIsLoading(false)
-          return
-        }
-
-        const tokenData = await tokenResponse.json()
-        const accessToken = tokenData.accessToken
-
-        if (!accessToken) {
-          logger.error('No access token returned')
-          setError('Authentication failed. Please reconnect your Jira account.')
-          setIsLoading(false)
-          return
-        }
-
-        // Build query parameters for the issues endpoint
-        const queryParams = new URLSearchParams({
-          domain,
-          accessToken,
-          ...(projectId && { projectId }),
-          ...(searchQuery && { query: searchQuery }),
-          ...(cloudId && { cloudId }),
-        })
-
-        const response = await fetch(`/api/tools/jira/issues?${queryParams.toString()}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          logger.error('Jira API error:', errorData)
-          throw new Error(errorData.error || 'Failed to fetch issues')
-        }
-
-        const data = await response.json()
-
-        if (data.cloudId) {
-          setCloudId(data.cloudId)
-        }
-
-        // Process the issue picker results
-        let foundIssues: JiraIssueInfo[] = []
-
-        // Handle the sections returned by the issue picker API
-        if (data.sections) {
-          // Combine issues from all sections
-          data.sections.forEach((section: any) => {
-            if (section.issues && section.issues.length > 0) {
-              const sectionIssues = section.issues.map((issue: any) => ({
-                id: issue.key,
-                name: issue.summary || issue.summaryText || issue.key,
-                mimeType: 'jira/issue',
-                url: `https://${domain}/browse/${issue.key}`,
-                webViewLink: `https://${domain}/browse/${issue.key}`,
-              }))
-              foundIssues = [...foundIssues, ...sectionIssues]
-            }
-          })
-        }
-
-        logger.info(`Received ${foundIssues.length} issues from API`)
-        setIssues(foundIssues)
-
-        // Cache issue names in display names store
-        if (selectedCredentialId && foundIssues.length > 0) {
-          const issueMap = foundIssues.reduce(
-            (acc: Record<string, string>, issue: JiraIssueInfo) => {
-              acc[issue.id] = issue.name
-              return acc
-            },
-            {}
-          )
-          useDisplayNamesStore.getState().setDisplayNames('files', selectedCredentialId, issueMap)
-        }
-
-        // If we have a selected issue ID, update state and notify parent
-        if (selectedIssueId) {
-          const issueInfo = foundIssues.find((issue: JiraIssueInfo) => issue.id === selectedIssueId)
-          if (issueInfo) {
-            setSelectedIssue(issueInfo)
-            onIssueInfoChange?.(issueInfo)
-          } else if (!searchQuery && selectedIssueId) {
-            // If we can't find the issue in the list, try to fetch it directly
-            fetchIssueInfo(selectedIssueId)
-          }
-        }
-      } catch (error) {
-        logger.error('Error fetching issues:', error)
-        setError((error as Error).message)
-        setIssues([])
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [
-      selectedCredentialId,
-      domain,
-      selectedIssueId,
-      onIssueInfoChange,
-      fetchIssueInfo,
-      cloudId,
-      projectId,
-    ]
-  )
-
-  // Fetch credentials when the dropdown opens (avoid fetching on mount with no credential)
+  // Fetch credentials list on mount (for account switching UI)
   useEffect(() => {
-    if (open) {
-      fetchCredentials()
+    fetchCredentials()
+  }, [fetchCredentials])
+
+  // Keep local credential state in sync with persisted credential
+  useEffect(() => {
+    if (credentialId && credentialId !== selectedCredentialId) {
+      setSelectedCredentialId(credentialId)
     }
-  }, [open, fetchCredentials])
+  }, [credentialId, selectedCredentialId])
 
   // Handle open change
   const handleOpenChange = (isOpen: boolean) => {
-    if (disabled || isForeignCredential) {
-      setOpen(false)
-      return
-    }
-    setOpen(isOpen)
-
-    // Only fetch recent/default issues when opening the dropdown
-    if (isOpen && selectedCredentialId && domain && domain.includes('.')) {
-      // Only fetch on open when a project is selected; otherwise wait for user search
-      if (projectId) {
-        fetchIssues('')
-      }
+    // Refetch issues when opening the dropdown if we have a project
+    if (isOpen && selectedCredentialId && domain && domain.includes('.') && projectId) {
+      refetchIssues()
     }
   }
 
-  // Fetch selected issue metadata once credentials are ready or changed
   // Keep internal selectedIssueId in sync with the value prop
   useEffect(() => {
     if (value !== selectedIssueId) {
       setSelectedIssueId(value)
     }
-    // When the upstream value is cleared (e.g., project changed or remote user cleared),
-    // clear local selection and preview immediately
+  }, [value, selectedIssueId])
+
+  // Clear callback when value is cleared
+  useEffect(() => {
     if (!value) {
-      setSelectedIssue(null)
-      setIssues([])
-      setError(null)
       onIssueInfoChange?.(null)
     }
   }, [value, onIssueInfoChange])
 
-  // Fetch issue info on mount if we have a value but no selectedIssue state
-  useEffect(() => {
-    if (value && selectedCredentialId && domain && projectId && !selectedIssue) {
-      fetchIssueInfo(value)
-    }
-  }, [value, selectedCredentialId, domain, projectId, selectedIssue, fetchIssueInfo])
-
   // Handle issue selection
-  const handleSelectIssue = (issue: JiraIssueInfo) => {
-    setSelectedIssueId(issue.id)
-    setSelectedIssue(issue)
-    onChange(issue.id, issue)
-    onIssueInfoChange?.(issue)
-    setOpen(false)
-  }
-
-  // Handle adding a new credential
-  const handleAddCredential = () => {
-    // Show the OAuth modal
-    setShowOAuthModal(true)
-    setOpen(false)
+  const handleSelectIssue = (selectedValue: string, metadata?: any) => {
+    const issue = metadata as JiraIssueInfo | undefined
+    setSelectedIssueId(selectedValue)
+    onChange(selectedValue, issue)
+    onIssueInfoChange?.(issue || null)
   }
 
   // Clear selection
   const handleClearSelection = () => {
     setSelectedIssueId('')
-    setError(null)
     onChange('', undefined)
     onIssueInfoChange?.(null)
   }
 
+  // Handle search - update search query state to trigger refetch
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query)
+  }, [])
+
+  // Convert issues to combobox options
+  const options = useMemo<ComboboxOption[]>(() => {
+    return issues.map((issue: JiraIssueInfo) => ({
+      label: issue.name,
+      value: issue.id,
+      icon: JiraIcon as ComponentType<{ className?: string }>,
+      metadata: issue,
+    }))
+  }, [issues])
+
+  // Account switcher component
+  const accountSwitcher = useMemo(() => {
+    if (!selectedCredentialId || credentials.length <= 1) return null
+
+    return (
+      <div className='flex items-center justify-between border-[var(--surface-11)] border-b px-3 py-2'>
+        <div className='flex items-center gap-2'>
+          <JiraIcon className='h-4 w-4' />
+          <span className='text-muted-foreground text-xs'>
+            {credentials.find((cred) => cred.id === selectedCredentialId)?.name || 'Unknown'}
+          </span>
+        </div>
+        {credentials.length > 1 && (
+          <select
+            value={selectedCredentialId}
+            onChange={(e) => setSelectedCredentialId(e.target.value)}
+            className='h-6 rounded bg-transparent px-2 text-xs hover:bg-[var(--surface-11)]'
+          >
+            {credentials.map((cred) => (
+              <option key={cred.id} value={cred.id}>
+                {cred.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    )
+  }, [selectedCredentialId, credentials])
+
+  // Preview card component
+  const previewCard = useMemo(() => {
+    if (!showPreview || !selectedIssue) return null
+
+    return (
+      <div className='relative rounded-md border border-muted bg-muted/10 p-2'>
+        <div className='absolute top-2 right-2'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='h-5 w-5 hover:bg-muted'
+            onClick={handleClearSelection}
+          >
+            <X className='h-3 w-3' />
+          </Button>
+        </div>
+        <div className='flex items-center gap-3 pr-4'>
+          <div className='flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-muted/20'>
+            <JiraIcon className='h-4 w-4' />
+          </div>
+          <div className='min-w-0 flex-1 overflow-hidden'>
+            <div className='flex items-center gap-2'>
+              <h4 className='truncate font-medium text-xs'>{selectedIssue.name}</h4>
+              {selectedIssue.modifiedTime && (
+                <span className='whitespace-nowrap text-muted-foreground text-xs'>
+                  {new Date(selectedIssue.modifiedTime).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            {selectedIssue.webViewLink && (
+              <a
+                href={selectedIssue.webViewLink}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='flex items-center gap-1 text-foreground text-xs hover:underline'
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>Open in Jira</span>
+                <ExternalLink className='h-3 w-3' />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }, [showPreview, selectedIssue, handleClearSelection])
+
+  // Custom render for options showing issue keys
+  const renderOption = useCallback((option: ComboboxOption) => {
+    return (
+      <>
+        <JiraIcon className='mr-[8px] h-4 w-4 flex-shrink-0 opacity-60' />
+        <span className='flex-1 truncate text-[var(--text-primary)]'>{option.label}</span>
+      </>
+    )
+  }, [])
+
+  const emptyMessage =
+    credentials.length === 0
+      ? 'No accounts connected. Connect a Jira account to continue.'
+      : 'No issues found. Try a different search or account.'
+
   return (
     <>
       <div className='space-y-2'>
-        <Popover open={open} onOpenChange={handleOpenChange}>
-          <PopoverTrigger asChild>
-            <Button
-              variant='outline'
-              role='combobox'
-              aria-expanded={open}
-              className='h-10 w-full min-w-0 justify-between'
-              disabled={disabled || !domain || !selectedCredentialId || isForeignCredential}
-            >
-              <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-                {cachedIssueName ? (
-                  <>
-                    <JiraIcon className='h-4 w-4' />
-                    <span className='truncate font-normal'>{cachedIssueName}</span>
-                  </>
-                ) : (
-                  <>
-                    <JiraIcon className='h-4 w-4' />
-                    <span className='truncate text-muted-foreground'>{label}</span>
-                  </>
-                )}
-              </div>
-              <ChevronDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-            </Button>
-          </PopoverTrigger>
-          {!isForeignCredential && (
-            <PopoverContent className='w-[300px] p-0' align='start'>
-              {/* Current account indicator */}
-              {selectedCredentialId && credentials.length > 0 && (
-                <div className='flex items-center justify-between border-b px-3 py-2'>
-                  <div className='flex items-center gap-2'>
-                    <JiraIcon className='h-4 w-4' />
-                    <span className='text-muted-foreground text-xs'>
-                      {credentials.find((cred) => cred.id === selectedCredentialId)?.name ||
-                        'Unknown'}
-                    </span>
-                  </div>
-                  {credentials.length > 1 && (
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      className='h-6 px-2 text-xs'
-                      onClick={() => setOpen(true)}
-                    >
-                      Switch
-                    </Button>
-                  )}
-                </div>
-              )}
+        <Combobox
+          options={options}
+          value={selectedIssueId}
+          onChange={handleSelectIssue}
+          placeholder={label}
+          disabled={disabled || !domain || !selectedCredentialId || isForeignCredential}
+          editable={true}
+          isLoading={isLoading}
+          error={error}
+          getDisplayName={getDisplayName}
+          renderOption={renderOption}
+          onOpenChange={handleOpenChange}
+          onSearch={handleSearch}
+          emptyMessage={emptyMessage}
+          accountSwitcher={accountSwitcher}
+          className={isForeignCredential ? 'cursor-help' : undefined}
+        />
 
-              <Command>
-                <CommandInput placeholder='Search issues...' onValueChange={handleSearch} />
-                <CommandList>
-                  <CommandEmpty>
-                    {isLoading ? (
-                      <div className='flex items-center justify-center p-4'>
-                        <RefreshCw className='h-4 w-4 animate-spin' />
-                        <span className='ml-2'>Loading issues...</span>
-                      </div>
-                    ) : error ? (
-                      <div className='p-4 text-center'>
-                        <p className='text-destructive text-sm'>{error}</p>
-                      </div>
-                    ) : credentials.length === 0 ? (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No accounts connected.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Connect a Jira account to continue.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className='p-4 text-center'>
-                        <p className='font-medium text-sm'>No issues found.</p>
-                        <p className='text-muted-foreground text-xs'>
-                          Try a different search or account.
-                        </p>
-                      </div>
-                    )}
-                  </CommandEmpty>
-
-                  {/* Account selection - only show if we have multiple accounts */}
-                  {credentials.length > 1 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Switch Account
-                      </div>
-                      {credentials.map((cred) => (
-                        <CommandItem
-                          key={cred.id}
-                          value={`account-${cred.id}`}
-                          onSelect={() => setSelectedCredentialId(cred.id)}
-                        >
-                          <div className='flex items-center gap-2'>
-                            <JiraIcon className='h-4 w-4' />
-                            <span className='font-normal'>{cred.name}</span>
-                          </div>
-                          {cred.id === selectedCredentialId && (
-                            <Check className='ml-auto h-4 w-4' />
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Issues list */}
-                  {issues.length > 0 && (
-                    <CommandGroup>
-                      <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                        Issues
-                      </div>
-                      {issues.map((issue) => (
-                        <CommandItem
-                          key={issue.id}
-                          value={`issue-${issue.id}-${issue.name}`}
-                          onSelect={() => handleSelectIssue(issue)}
-                        >
-                          <div className='flex items-center gap-2 overflow-hidden'>
-                            <JiraIcon className='h-4 w-4' />
-                            <span className='truncate font-normal'>{issue.name}</span>
-                          </div>
-                          {issue.id === selectedIssueId && <Check className='ml-auto h-4 w-4' />}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-
-                  {/* Connect account option - only show if no credentials */}
-                  {credentials.length === 0 && (
-                    <CommandGroup>
-                      <CommandItem onSelect={handleAddCredential}>
-                        <div className='flex items-center gap-2 text-foreground'>
-                          <JiraIcon className='h-4 w-4' />
-                          <span>Connect Jira account</span>
-                        </div>
-                      </CommandItem>
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          )}
-        </Popover>
-
-        {showPreview && selectedIssue && (
-          <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>
-            <div className='absolute top-2 right-2'>
-              <Button
-                variant='ghost'
-                size='icon'
-                className='h-5 w-5 hover:bg-muted'
-                onClick={handleClearSelection}
-              >
-                <X className='h-3 w-3' />
-              </Button>
-            </div>
-            <div className='flex items-center gap-3 pr-4'>
-              <div className='flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-muted/20'>
-                <JiraIcon className='h-4 w-4' />
-              </div>
-              <div className='min-w-0 flex-1 overflow-hidden'>
-                <div className='flex items-center gap-2'>
-                  <h4 className='truncate font-medium text-xs'>{selectedIssue.name}</h4>
-                  {selectedIssue.modifiedTime && (
-                    <span className='whitespace-nowrap text-muted-foreground text-xs'>
-                      {new Date(selectedIssue.modifiedTime).toLocaleDateString()}
-                    </span>
-                  )}
-                </div>
-                {selectedIssue.webViewLink && (
-                  <a
-                    href={selectedIssue.webViewLink}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                    className='flex items-center gap-1 text-foreground text-xs hover:underline'
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span>Open in Jira</span>
-                    <ExternalLink className='h-3 w-3' />
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {showPreview && selectedIssue && previewCard}
       </div>
 
       {showOAuthModal && (

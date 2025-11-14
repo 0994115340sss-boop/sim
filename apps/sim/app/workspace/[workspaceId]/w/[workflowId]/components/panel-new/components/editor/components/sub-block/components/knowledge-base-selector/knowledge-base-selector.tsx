@@ -185,45 +185,50 @@ export function KnowledgeBaseSelector({
   const label =
     subBlock.placeholder || (isMultiSelect ? 'Select knowledge bases' : 'Select knowledge base')
 
-  return (
-    <div className='w-full'>
-      {/* Selected knowledge bases display (for multi-select) */}
-      {isMultiSelect && selectedKnowledgeBases.length > 0 && (
-        <div className='mb-2 flex flex-wrap gap-1'>
-          {selectedKnowledgeBases.map((kb) => (
-            <div
-              key={kb.id}
-              className='inline-flex items-center rounded-md border border-[#00B0B0]/20 bg-[#00B0B0]/10 px-2 py-1 text-xs'
-            >
-              <PackageSearchIcon className='mr-1 h-3 w-3 text-[#00B0B0]' />
-              <span className='font-medium text-[#00B0B0]'>{kb.name}</span>
-              {!disabled && !isPreview && (
-                <button
-                  type='button'
-                  onClick={() => handleRemoveKnowledgeBase(kb.id)}
-                  className='ml-1 text-[#00B0B0]/60 hover:text-[#00B0B0]'
-                  aria-label={`Remove ${kb.name}`}
-                >
-                  <X className='h-3 w-3' />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+  // Render tags above dropdown for multi-select
+  const renderTags = useMemo(() => {
+    if (!isMultiSelect || selectedKnowledgeBases.length === 0) return undefined
 
-      <Combobox
-        options={options}
-        value={isMultiSelect ? undefined : (selectedIds[0] ?? '')}
-        multiSelect={isMultiSelect}
-        multiSelectValues={isMultiSelect ? selectedIds : undefined}
-        onChange={handleChange}
-        onMultiSelectChange={handleMultiSelectChange}
-        placeholder={label}
-        disabled={disabled || isPreview}
-        isLoading={loadingKnowledgeBasesList}
-        error={error}
-      />
-    </div>
+    return (
+      <div className='flex flex-wrap gap-1'>
+        {selectedKnowledgeBases.map((kb) => (
+          <div
+            key={kb.id}
+            className='inline-flex items-center rounded-md border border-[#00B0B0]/20 bg-[#00B0B0]/10 px-2 py-1 text-xs'
+          >
+            <PackageSearchIcon className='mr-1 h-3 w-3 text-[#00B0B0]' />
+            <span className='font-medium text-[#00B0B0]'>{kb.name}</span>
+            {!disabled && !isPreview && (
+              <button
+                type='button'
+                onClick={() => handleRemoveKnowledgeBase(kb.id)}
+                className='ml-1 text-[#00B0B0]/60 hover:text-[#00B0B0]'
+                aria-label={`Remove ${kb.name}`}
+              >
+                <X className='h-3 w-3' />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }, [isMultiSelect, selectedKnowledgeBases, disabled, isPreview, handleRemoveKnowledgeBase])
+
+  return (
+    <Combobox
+      options={options}
+      value={isMultiSelect ? undefined : (selectedIds[0] ?? '')}
+      multiSelect={isMultiSelect}
+      multiSelectValues={isMultiSelect ? selectedIds : undefined}
+      onChange={handleChange}
+      onMultiSelectChange={handleMultiSelectChange}
+      placeholder={label}
+      disabled={disabled || isPreview}
+      isLoading={loadingKnowledgeBasesList}
+      error={error}
+      icon={PackageSearchIcon}
+      filterOptions={true}
+      renderAbove={renderTags}
+    />
   )
 }

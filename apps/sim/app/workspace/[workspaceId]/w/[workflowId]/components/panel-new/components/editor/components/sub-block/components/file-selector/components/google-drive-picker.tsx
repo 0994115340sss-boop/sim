@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ExternalLink, FileIcon, FolderIcon, RefreshCw, X } from 'lucide-react'
+import { ExternalLink, FileIcon, FolderIcon } from 'lucide-react'
 import useDrivePicker from 'react-google-drive-picker'
+import { Combobox } from '@/components/emcn'
 import { GoogleDocsIcon, GoogleSheetsIcon } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { getEnv } from '@/lib/env'
@@ -450,21 +451,81 @@ export function GoogleDrivePicker({
     return <FileIcon className={`${iconSize} text-muted-foreground`} />
   }
 
-  const canShowPreview = !!(
-    showPreview &&
-    selectedFile &&
-    selectedFileId &&
-    selectedFile.id === selectedFileId
+  // Cache display name for selected file
+  const cachedFileName = useDisplayNamesStore(
+    useCallback(
+      (state) => {
+        if (!selectedCredentialId || !selectedFileId) return null
+        return state.cache.files[selectedCredentialId]?.[selectedFileId] || null
+      },
+      [selectedCredentialId, selectedFileId]
+    )
   )
 
-  return (
-    <>
+  const getDisplayName = useCallback(
+    (fileId: string) => {
+      if (!selectedCredentialId) return null
+      return useDisplayNamesStore.getState().cache.files[selectedCredentialId]?.[fileId] || null
+    },
+    [selectedCredentialId]
+  )
+
+  // Render account switcher
+  const renderAccountSwitcher = () => {
+    if (credentials.length <= 1) return null
+
+    return (
+      <div className='border-[var(--surface-11)] border-b pb-1'>
+        <div className='mb-1 px-2 font-medium text-[var(--text-muted)] text-xs'>Switch Account</div>
+        {credentials.map((cred) => (
+          <div
+            key={cred.id}
+            className='flex cursor-pointer items-center justify-between rounded px-2 py-1 hover:bg-[var(--surface-11)]'
+            onClick={() => setSelectedCredentialId(cred.id)}
+          >
+            <div className='flex items-center gap-2'>
+              {getProviderIcon(provider)}
+              <span className='text-sm'>{cred.name}</span>
+            </div>
+            {cred.id === selectedCredentialId && (
+              <svg
+                width='16'
+                height='16'
+                viewBox='0 0 16 16'
+                fill='none'
+                className='text-[var(--text-primary)]'
+              >
+                <path
+                  d='M13.5 4.5L6 12L2.5 8.5'
+                  stroke='currentColor'
+                  strokeWidth='2'
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                />
+              </svg>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Render footer with Google Drive Picker button
+  const renderPickerFooter = () => {
+    const canShowPreview = !!(
+      showPreview &&
+      selectedFile &&
+      selectedFileId &&
+      selectedFile.id === selectedFileId
+    )
+
+    return (
       <div className='space-y-2'>
+        {/* Google Drive Picker Button */}
         <Button
           variant='outline'
-          role='combobox'
-          className='h-10 w-full min-w-0 justify-between'
-          disabled={disabled || isLoading}
+          size='sm'
+          className='w-full'
           onClick={async () => {
             // Decide which credential to use
             let idToUse = selectedCredentialId
@@ -481,49 +542,24 @@ export function GoogleDrivePicker({
 
             await handleOpenPicker(idToUse)
           }}
+          disabled={disabled || isLoading}
         >
-          <div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-            {canShowPreview ? (
-              <>
-                {getFileIcon(selectedFile, 'sm')}
-                <span className='truncate font-normal'>{selectedFile.name}</span>
-              </>
-            ) : selectedFileId && isLoadingSelectedFile && selectedCredentialId ? (
-              <>
-                <RefreshCw className='h-4 w-4 animate-spin' />
-                <span className='truncate text-muted-foreground'>Loading document...</span>
-              </>
-            ) : (
-              <>
-                {getProviderIcon(provider)}
-                <span className='truncate text-muted-foreground'>{label}</span>
-              </>
-            )}
-          </div>
+          {getProviderIcon(provider)}
+          <span className='ml-2'>Browse {getProviderName(provider)}</span>
         </Button>
 
-        {/* File preview */}
+        {/* File Preview Card */}
         {canShowPreview && (
-          <div className='relative mt-2 rounded-md border border-muted bg-muted/10 p-2'>
-            <div className='absolute top-2 right-2'>
-              <Button
-                variant='ghost'
-                size='icon'
-                className='h-5 w-5 hover:bg-muted'
-                onClick={handleClearSelection}
-              >
-                <X className='h-3 w-3' />
-              </Button>
-            </div>
-            <div className='flex items-center gap-3 pr-4'>
-              <div className='flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-muted/20'>
+          <div className='rounded-md border border-[var(--surface-11)] bg-[var(--surface-6)] p-2'>
+            <div className='flex items-center gap-3'>
+              <div className='flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-[var(--surface-9)]'>
                 {getFileIcon(selectedFile, 'sm')}
               </div>
               <div className='min-w-0 flex-1 overflow-hidden'>
                 <div className='flex items-center gap-2'>
                   <h4 className='truncate font-medium text-xs'>{selectedFile.name}</h4>
                   {selectedFile.modifiedTime && (
-                    <span className='whitespace-nowrap text-muted-foreground text-xs'>
+                    <span className='whitespace-nowrap text-[var(--text-muted)] text-xs'>
                       {new Date(selectedFile.modifiedTime).toLocaleDateString()}
                     </span>
                   )}
@@ -533,7 +569,7 @@ export function GoogleDrivePicker({
                     href={selectedFile.webViewLink}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-1 text-muted-foreground text-xs hover:underline'
+                    className='flex items-center gap-1 text-[var(--text-muted)] text-xs hover:underline'
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span>Open in Drive</span>
@@ -544,7 +580,7 @@ export function GoogleDrivePicker({
                     href={`https://drive.google.com/file/d/${selectedFile.id}/view`}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-1 text-muted-foreground text-xs hover:underline'
+                    className='flex items-center gap-1 text-[var(--text-muted)] text-xs hover:underline'
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span>Open in Drive</span>
@@ -556,6 +592,31 @@ export function GoogleDrivePicker({
           </div>
         )}
       </div>
+    )
+  }
+
+  return (
+    <>
+      <Combobox
+        options={[]}
+        value={selectedFileId}
+        onChange={(val) => {
+          // Handle only clearing through clear button
+          if (!val) {
+            handleClearSelection()
+          }
+        }}
+        placeholder={label}
+        disabled={disabled || isLoading}
+        isLoading={isLoadingSelectedFile && !!selectedCredentialId}
+        getDisplayName={getDisplayName}
+        allowClear={!!selectedFileId}
+        onClear={handleClearSelection}
+        icon={() => getProviderIcon(provider)}
+        accountSwitcher={renderAccountSwitcher()}
+        renderFooter={renderPickerFooter()}
+        emptyMessage='Click "Browse" to select files'
+      />
 
       {showOAuthModal && (
         <OAuthRequiredModal

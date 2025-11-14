@@ -1,5 +1,6 @@
 import {
   type ChangeEvent,
+  type ComponentType,
   forwardRef,
   type HTMLAttributes,
   type KeyboardEvent,
@@ -11,7 +12,7 @@ import {
   useState,
 } from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
-import { Check, ChevronDown, Loader2 } from 'lucide-react'
+import { Check, ChevronDown, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '../input/input'
 import { Popover, PopoverAnchor, PopoverContent, PopoverScrollArea } from '../popover/popover'
@@ -36,7 +37,13 @@ const comboboxVariants = cva(
 export type ComboboxOption = {
   label: string
   value: string
-  icon?: React.ComponentType<{ className?: string }>
+  icon?: ComponentType<{ className?: string }>
+  disabled?: boolean
+  badge?: string
+  metadata?: any
+  subtitle?: string
+  description?: string
+  avatarUrl?: string
 }
 
 export interface ComboboxProps
@@ -49,7 +56,7 @@ export interface ComboboxProps
   /** Current selected values for multi-select mode */
   multiSelectValues?: string[]
   /** Callback when value changes */
-  onChange?: (value: string) => void
+  onChange?: (value: string, metadata?: any) => void
   /** Callback when multi-select values change */
   onMultiSelectChange?: (values: string[]) => void
   /** Placeholder text when no value is selected */
@@ -79,6 +86,32 @@ export interface ComboboxProps
   error?: string | null
   /** Callback when popover open state changes */
   onOpenChange?: (open: boolean) => void
+  /** Function to get display name from cache (e.g., for ID -> name mapping) */
+  getDisplayName?: (value: string) => string | null
+  /** Custom rendering for each option */
+  renderOption?: (option: ComboboxOption) => ReactNode
+  /** Custom rendering for the trigger button */
+  renderTrigger?: (selected: ComboboxOption | null) => ReactNode
+  /** Callback for server-side search */
+  onSearch?: (query: string) => void
+  /** Debounce delay in ms for search (default: 300) */
+  debounceMs?: number
+  /** Custom empty state message */
+  emptyMessage?: string
+  /** Show clear button to reset selection */
+  allowClear?: boolean
+  /** Callback when clear button is clicked */
+  onClear?: () => void
+  /** Provider/resource icon to display in trigger */
+  icon?: ComponentType<{ className?: string }>
+  /** Custom content to render above the options list */
+  renderAbove?: ReactNode
+  /** Custom content to render below the options list */
+  renderFooter?: ReactNode
+  /** Custom content to render when there are no options */
+  renderEmpty?: ReactNode
+  /** Account switcher component (for OAuth selectors) */
+  accountSwitcher?: ReactNode
 }
 
 /**
@@ -108,6 +141,19 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
       isLoading = false,
       error = null,
       onOpenChange,
+      getDisplayName,
+      renderOption,
+      renderTrigger,
+      onSearch,
+      debounceMs = 300,
+      emptyMessage,
+      allowClear = false,
+      onClear,
+      icon: TriggerIcon,
+      renderAbove,
+      renderFooter,
+      renderEmpty,
+      accountSwitcher,
       ...props
     },
     ref
@@ -118,6 +164,7 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
     const dropdownRef = useRef<HTMLDivElement>(null)
     const internalInputRef = useRef<HTMLInputElement>(null)
     const inputRef = externalInputRef || internalInputRef
+    const searchTimerRef = useRef<NodeJS.Timeout | null>(null)
 
     const effectiveSelectedValue = selectedValue ?? value
 
@@ -126,17 +173,42 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
       [options, effectiveSelectedValue]
     )
 
+    // Get display name from cache if available
+    const displayName = useMemo(() => {
+      if (!effectiveSelectedValue) return null
+      if (selectedOption) return selectedOption.label
+      if (getDisplayName) return getDisplayName(effectiveSelectedValue)
+      return null
+    }, [effectiveSelectedValue, selectedOption, getDisplayName])
+
+    // Cleanup search timer on unmount
+    useEffect(() => {
+      return () => {
+        if (searchTimerRef.current) {
+          clearTimeout(searchTimerRef.current)
+        }
+      }
+    }, [])
+
     /**
      * Filter options based on current value
      */
     const filteredOptions = useMemo(() => {
-      if (!filterOptions || !value || !open) return options
+      // If server-side search is enabled, don't filter client-side
+      if (onSearch) return options
 
-      const currentValue = value.toString().toLowerCase()
+      // If no filtering is needed, return all options
+      if (!filterOptions || !open) return options
+
+      // Use the current value for filtering
+      const query = value
+      if (!query) return options
+
+      const currentValue = query.toString().toLowerCase()
 
       // If value exactly matches an option, show all
       const exactMatch = options.find(
-        (opt) => opt.value === value || opt.label.toLowerCase() === currentValue
+        (opt) => opt.value === query || opt.label.toLowerCase() === currentValue
       )
       if (exactMatch) return options
 
@@ -146,7 +218,7 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
         const optionValue = option.value.toLowerCase()
         return label.includes(currentValue) || optionValue.includes(currentValue)
       })
-    }, [options, value, open, filterOptions])
+    }, [options, value, open, filterOptions, onSearch])
 
     /**
      * Handles selection of an option
@@ -160,7 +232,8 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
             : [...currentValues, selectedValue]
           onMultiSelectChange(newValues)
         } else {
-          onChange?.(selectedValue)
+          const selectedOpt = options.find((opt) => opt.value === selectedValue)
+          onChange?.(selectedValue, selectedOpt?.metadata)
           setOpen(false)
           setHighlightedIndex(-1)
           if (editable && inputRef.current) {
@@ -168,7 +241,23 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
           }
         }
       },
-      [onChange, multiSelect, onMultiSelectChange, multiSelectValues, editable, inputRef]
+      [onChange, multiSelect, onMultiSelectChange, multiSelectValues, editable, inputRef, options]
+    )
+
+    /**
+     * Handles clear button click
+     */
+    const handleClear = useCallback(
+      (e: React.MouseEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (onClear) {
+          onClear()
+        } else {
+          onChange?.('', undefined)
+        }
+      },
+      [onChange, onClear]
     )
 
     /**
@@ -177,9 +266,23 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
     const handleInputChange = useCallback(
       (e: ChangeEvent<HTMLInputElement>) => {
         if (disabled || !editable) return
-        onChange?.(e.target.value)
+        const newValue = e.target.value
+        onChange?.(newValue, undefined)
+
+        // Handle server-side search with debouncing
+        if (onSearch) {
+          // Clear existing timer
+          if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current)
+          }
+
+          // Set new timer for debounced search
+          searchTimerRef.current = setTimeout(() => {
+            onSearch(newValue)
+          }, debounceMs)
+        }
       },
-      [disabled, editable, onChange]
+      [disabled, editable, onChange, onSearch, debounceMs]
     )
 
     /**
@@ -401,25 +504,57 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                   onClick={handleToggle}
                   onKeyDown={handleKeyDown}
                 >
-                  <span
-                    className={cn(
-                      'flex-1 truncate',
-                      !selectedOption && 'text-[var(--text-muted)]',
-                      overlayContent && 'text-transparent'
-                    )}
-                  >
-                    {selectedOption ? selectedOption.label : placeholder}
-                  </span>
-                  <ChevronDown
-                    className={cn(
-                      'ml-[8px] h-4 w-4 flex-shrink-0 opacity-50 transition-transform',
-                      open && 'rotate-180'
-                    )}
-                  />
-                  {overlayContent && (
-                    <div className='pointer-events-none absolute inset-y-0 right-[24px] left-0 flex items-center px-[8px]'>
-                      <div className='w-full truncate'>{overlayContent}</div>
-                    </div>
+                  {renderTrigger ? (
+                    renderTrigger(selectedOption || null)
+                  ) : (
+                    <>
+                      <div className='flex flex-1 items-center gap-[8px] overflow-hidden'>
+                        {(TriggerIcon || SelectedIcon) && (
+                          <>
+                            {TriggerIcon && (
+                              <TriggerIcon className='h-3 w-3 flex-shrink-0 opacity-60' />
+                            )}
+                            {!TriggerIcon && SelectedIcon && (
+                              <SelectedIcon className='h-3 w-3 flex-shrink-0 opacity-60' />
+                            )}
+                          </>
+                        )}
+                        <span
+                          className={cn(
+                            'flex-1 truncate',
+                            !selectedOption && !displayName && 'text-[var(--text-muted)]',
+                            overlayContent && 'text-transparent'
+                          )}
+                        >
+                          {displayName || selectedOption?.label || placeholder}
+                        </span>
+                      </div>
+                      <div className='ml-[8px] flex flex-shrink-0 items-center gap-[4px]'>
+                        {allowClear && (effectiveSelectedValue || displayName) && (
+                          <div
+                            onClick={handleClear}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                            className='flex h-4 w-4 items-center justify-center rounded-[2px] hover:bg-[var(--surface-11)]'
+                          >
+                            <X className='h-3 w-3 opacity-50 hover:opacity-100' />
+                          </div>
+                        )}
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 opacity-50 transition-transform',
+                            open && 'rotate-180'
+                          )}
+                        />
+                      </div>
+                      {overlayContent && (
+                        <div className='pointer-events-none absolute inset-y-0 right-[24px] left-0 flex items-center px-[8px]'>
+                          <div className='w-full truncate'>{overlayContent}</div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -444,6 +579,12 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
               }
             }}
           >
+            {/* Account switcher */}
+            {accountSwitcher && <div className='p-[4px]'>{accountSwitcher}</div>}
+
+            {/* Custom content above options */}
+            {renderAbove && <div className='p-[4px]'>{renderAbove}</div>}
+
             <PopoverScrollArea
               className='!flex-none max-h-48 p-[4px]'
               onWheelCapture={(e) => {
@@ -477,9 +618,14 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                     {error}
                   </div>
                 ) : filteredOptions.length === 0 ? (
-                  <div className='py-[14px] text-center font-medium font-sans text-[var(--text-muted)] text-sm'>
-                    {editable && value ? 'No matching options found' : 'No options available'}
-                  </div>
+                  renderEmpty ? (
+                    renderEmpty
+                  ) : (
+                    <div className='py-[14px] text-center font-medium font-sans text-[var(--text-muted)] text-sm'>
+                      {emptyMessage ||
+                        (editable && value ? 'No matching options found' : 'No options available')}
+                    </div>
+                  )
                 ) : (
                   filteredOptions.map((option, index) => {
                     const isSelected = multiSelect
@@ -493,30 +639,51 @@ const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                         key={option.value}
                         role='option'
                         aria-selected={isSelected}
+                        aria-disabled={option.disabled}
                         data-option-index={index}
                         onMouseDown={(e) => {
+                          if (option.disabled) return
                           e.preventDefault()
                           e.stopPropagation()
                           handleSelect(option.value)
                         }}
-                        onMouseEnter={() => setHighlightedIndex(index)}
+                        onMouseEnter={() => !option.disabled && setHighlightedIndex(index)}
                         className={cn(
-                          'relative flex cursor-pointer select-none items-center rounded-[4px] px-[8px] py-[6px] font-medium font-sans text-sm',
-                          isHighlighted && 'bg-[var(--surface-11)]',
-                          !isHighlighted && 'hover:bg-[var(--surface-11)]'
+                          'relative flex select-none items-center rounded-[4px] px-[8px] py-[6px] font-medium font-sans text-sm',
+                          option.disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+                          !option.disabled && isHighlighted && 'bg-[var(--surface-11)]',
+                          !option.disabled && !isHighlighted && 'hover:bg-[var(--surface-11)]'
                         )}
                       >
-                        {OptionIcon && <OptionIcon className='mr-[8px] h-3 w-3 opacity-60' />}
-                        <span className='flex-1 truncate text-[var(--text-primary)]'>
-                          {option.label}
-                        </span>
-                        {isSelected && <Check className='ml-[8px] h-4 w-4 flex-shrink-0' />}
+                        {renderOption ? (
+                          renderOption(option)
+                        ) : (
+                          <>
+                            {OptionIcon && (
+                              <OptionIcon className='mr-[8px] h-3 w-3 flex-shrink-0 opacity-60' />
+                            )}
+                            <span className='flex-1 truncate text-[var(--text-primary)]'>
+                              {option.label}
+                            </span>
+                            {option.badge && (
+                              <span className='ml-[8px] rounded-[4px] bg-[var(--surface-11)] px-[6px] py-[2px] text-[var(--text-muted)] text-xs'>
+                                {option.badge}
+                              </span>
+                            )}
+                            {isSelected && <Check className='ml-[8px] h-4 w-4 flex-shrink-0' />}
+                          </>
+                        )}
                       </div>
                     )
                   })
                 )}
               </div>
             </PopoverScrollArea>
+
+            {/* Custom content below options */}
+            {renderFooter && (
+              <div className='border-[var(--surface-11)] border-t p-[4px]'>{renderFooter}</div>
+            )}
           </PopoverContent>
         </div>
       </Popover>

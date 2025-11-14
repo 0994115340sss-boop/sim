@@ -1,16 +1,8 @@
-import { useCallback, useState } from 'react'
-import { Check, ChevronDown, Hash, Lock, RefreshCw } from 'lucide-react'
+import { type ComponentType, useCallback, useEffect, useMemo } from 'react'
+import { Check, Hash, Lock } from 'lucide-react'
+import { Combobox, type ComboboxOption } from '@/components/emcn/components/combobox/combobox'
 import { SlackIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useResourceList } from '@/hooks/queries/resources'
 import { useDisplayNamesStore } from '@/stores/display-names/store'
 
 export interface SlackChannelInfo {
@@ -38,13 +30,62 @@ export function SlackChannelSelector({
   workflowId,
   isForeignCredential = false,
 }: SlackChannelSelectorProps) {
-  const [channels, setChannels] = useState<SlackChannelInfo[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [initialFetchDone, setInitialFetchDone] = useState(false)
+  // Fetch all channels using React Query
+  const {
+    data: channels = [],
+    isLoading: loading,
+    error: channelsError,
+    refetch: refetchChannels,
+  } = useResourceList<SlackChannelInfo>({
+    resourceType: 'channels',
+    credential,
+    endpoint: '/api/tools/slack/channels',
+    params: { workflowId },
+  })
 
-  // Get cached display name
+  // Fetch metadata for the selected channel (if value exists but not in channels list yet)
+  // This ensures the selected channel name displays on mount before the full list loads
+  // Note: We fetch the full channels list again to populate the cache and find the selected channel
+  const shouldFetchMetadata = !!value && !!credential && channels.length === 0
+  const { data: metadataChannels = [] } = useResourceList<SlackChannelInfo>({
+    resourceType: 'channels',
+    credential,
+    endpoint: '/api/tools/slack/channels',
+    params: { workflowId },
+    enabled: shouldFetchMetadata,
+  })
+
+  // Extract the selected channel from the metadata fetch
+  const selectedChannelMeta = useMemo(() => {
+    if (!value || metadataChannels.length === 0) return undefined
+    return metadataChannels.find((ch: SlackChannelInfo) => ch.id === value)
+  }, [value, metadataChannels])
+
+  // Merge selected channel metadata with channels list
+  // This ensures we always have the selected channel info for display
+  const allChannels = useMemo(() => {
+    if (!selectedChannelMeta) return channels
+
+    // Check if selected channel is already in the list
+    const channelExists = channels.some((ch: SlackChannelInfo) => ch.id === selectedChannelMeta.id)
+    if (channelExists) return channels
+
+    // Add the selected channel to the beginning of the list
+    return [selectedChannelMeta, ...channels]
+  }, [channels, selectedChannelMeta])
+
+  // Cache channel names in display names store (for backward compatibility)
+  useEffect(() => {
+    if (credential && allChannels.length > 0) {
+      const channelMap = allChannels.reduce((acc: Record<string, string>, ch: SlackChannelInfo) => {
+        acc[ch.id] = `#${ch.name}`
+        return acc
+      }, {})
+      useDisplayNamesStore.getState().setDisplayNames('channels', credential, channelMap)
+    }
+  }, [credential, allChannels])
+
+  // Get cached display name (fallback for edge cases)
   const cachedChannelName = useDisplayNamesStore(
     useCallback(
       (state) => {
@@ -55,165 +96,106 @@ export function SlackChannelSelector({
     )
   )
 
-  // Fetch channels from Slack API
-  const fetchChannels = useCallback(async () => {
-    if (!credential) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/tools/slack/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential, workflowId }),
-      })
-
-      if (!res.ok) {
-        const errorData = await res
-          .json()
-          .catch(() => ({ error: `HTTP error! status: ${res.status}` }))
-        setError(errorData.error || `HTTP error! status: ${res.status}`)
-        setChannels([])
-        setInitialFetchDone(true)
-        return
-      }
-
-      const data = await res.json()
-      if (data.error) {
-        setError(data.error)
-        setChannels([])
-        setInitialFetchDone(true)
-      } else {
-        setChannels(data.channels)
-        setInitialFetchDone(true)
-
-        // Cache channel names in display names store
-        if (credential) {
-          const channelMap = data.channels.reduce(
-            (acc: Record<string, string>, ch: SlackChannelInfo) => {
-              acc[ch.id] = `#${ch.name}`
-              return acc
-            },
-            {}
-          )
-          useDisplayNamesStore.getState().setDisplayNames('channels', credential, channelMap)
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') return
-      setError((err as Error).message)
-      setChannels([])
-      setInitialFetchDone(true)
-    } finally {
-      setLoading(false)
+  // Eager caching: If we have a value but no cached name, fetch channels immediately
+  // This fixes the bug where channel names show "-" on page refresh until user clicks the block
+  useEffect(() => {
+    if (value && credential && !cachedChannelName && !loading && !isForeignCredential) {
+      refetchChannels()
     }
-  }, [credential])
+  }, [value, credential, cachedChannelName, loading, isForeignCredential, refetchChannels])
 
-  // Handle dropdown open/close - fetch channels when opening
+  // Handle dropdown open/close - refetch channels when opening
   const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
-
-    // Only fetch channels when opening the dropdown and if we have valid credential
-    if (isOpen && credential && (!initialFetchDone || channels.length === 0)) {
-      fetchChannels()
+    if (isOpen && credential) {
+      refetchChannels()
     }
   }
 
-  const handleSelectChannel = (channel: SlackChannelInfo) => {
-    onChange(channel.id, channel)
-    setOpen(false)
-  }
+  const error = channelsError ? (channelsError as Error).message : null
 
-  const getChannelIcon = (channel: SlackChannelInfo) => {
-    return channel.isPrivate ? <Lock className='h-1.5 w-1.5' /> : <Hash className='h-1.5 w-1.5' />
-  }
+  // Convert channels to ComboboxOption format
+  const channelOptions: ComboboxOption[] = allChannels.map((channel: SlackChannelInfo) => ({
+    label: channel.name,
+    value: channel.id,
+    icon: SlackIcon as ComponentType<{ className?: string }>,
+    metadata: channel,
+    badge: channel.isPrivate ? 'Private' : undefined,
+  }))
 
-  const formatChannelName = (channel: SlackChannelInfo) => {
-    return channel.name
-  }
+  // Get display name from cache
+  const getDisplayName = useCallback(
+    (channelId: string) => {
+      if (!credential || !channelId) return null
+      return cachedChannelName
+    },
+    [credential, cachedChannelName]
+  )
+
+  // Custom render for each channel option
+  const renderChannelOption = useCallback(
+    (option: ComboboxOption) => {
+      const channel = option.metadata as SlackChannelInfo
+      const ChannelIcon = channel.isPrivate ? Lock : Hash
+
+      return (
+        <>
+          <ChannelIcon className='mr-[8px] h-3 w-3 flex-shrink-0 opacity-60' />
+          <span className='flex-1 truncate text-[var(--text-primary)]'>{option.label}</span>
+          {option.badge && (
+            <span className='ml-[8px] rounded-[4px] bg-[var(--surface-11)] px-[6px] py-[2px] text-[var(--text-muted)] text-xs'>
+              {option.badge}
+            </span>
+          )}
+          {option.value === value && <Check className='ml-[8px] h-4 w-4 flex-shrink-0' />}
+        </>
+      )
+    },
+    [value]
+  )
+
+  // Error message for empty state
+  const emptyMessage = !credential
+    ? 'Please configure Slack credentials.'
+    : 'No channels available for this Slack workspace.'
+
+  // Get selected channel for overlay
+  const selectedChannel = useMemo(() => {
+    if (!value) return null
+    return allChannels.find((ch: SlackChannelInfo) => ch.id === value)
+  }, [value, allChannels])
+
+  // Overlay content to show display name instead of ID
+  const overlayContent = useMemo(() => {
+    if (!selectedChannel) return null
+    const ChannelIcon = selectedChannel.isPrivate ? Lock : Hash
+    return (
+      <div className='flex items-center truncate'>
+        <SlackIcon className='mr-[8px] h-3 w-3 flex-shrink-0 text-[#611f69]' />
+        <ChannelIcon className='mr-[8px] h-3 w-3 flex-shrink-0 opacity-60' />
+        <span className='truncate'>#{selectedChannel.name}</span>
+      </div>
+    )
+  }, [selectedChannel])
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          variant='outline'
-          role='combobox'
-          aria-expanded={open}
-          className='relative w-full justify-between'
-          disabled={disabled || !credential}
-          title={isForeignCredential ? 'Using a shared account' : undefined}
-        >
-          <div className='flex max-w-[calc(100%-20px)] items-center gap-2 overflow-hidden'>
-            <SlackIcon className='h-4 w-4 text-[#611f69]' />
-            {cachedChannelName ? (
-              <span className='truncate font-normal'>{cachedChannelName}</span>
-            ) : (
-              <span className='truncate text-muted-foreground'>{label}</span>
-            )}
-          </div>
-          <ChevronDown className='absolute right-3 h-4 w-4 shrink-0 opacity-50' />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className='w-[250px] p-0' align='start'>
-        <Command>
-          <CommandInput placeholder='Search channels...' />
-          <CommandList>
-            <CommandEmpty>
-              {loading ? (
-                <div className='flex items-center justify-center p-4'>
-                  <RefreshCw className='h-4 w-4 animate-spin' />
-                  <span className='ml-2'>Loading channels...</span>
-                </div>
-              ) : error ? (
-                <div className='p-4 text-center'>
-                  <p className='text-destructive text-sm'>{error}</p>
-                </div>
-              ) : !credential ? (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>Missing credentials</p>
-                  <p className='text-muted-foreground text-xs'>
-                    Please configure Slack credentials.
-                  </p>
-                </div>
-              ) : (
-                <div className='p-4 text-center'>
-                  <p className='font-medium text-sm'>No channels found</p>
-                  <p className='text-muted-foreground text-xs'>
-                    No channels available for this Slack workspace.
-                  </p>
-                </div>
-              )}
-            </CommandEmpty>
-
-            {channels.length > 0 && (
-              <CommandGroup>
-                <div className='px-2 py-1.5 font-medium text-muted-foreground text-xs'>
-                  Channels
-                </div>
-                {channels.map((channel) => (
-                  <CommandItem
-                    key={channel.id}
-                    value={`channel-${channel.id}-${channel.name}`}
-                    onSelect={() => handleSelectChannel(channel)}
-                    className='cursor-pointer'
-                  >
-                    <div className='flex items-center gap-2 overflow-hidden'>
-                      <SlackIcon className='h-4 w-4 text-[#611f69]' />
-                      {getChannelIcon(channel)}
-                      <span className='truncate font-normal'>{formatChannelName(channel)}</span>
-                      {channel.isPrivate && (
-                        <span className='ml-auto text-muted-foreground text-xs'>Private</span>
-                      )}
-                    </div>
-                    {channel.id === value && <Check className='ml-auto h-4 w-4' />}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <Combobox
+      options={channelOptions}
+      value={value}
+      onChange={(channelId, metadata) => {
+        const channelInfo = metadata as SlackChannelInfo | undefined
+        onChange(channelId, channelInfo)
+      }}
+      placeholder={label}
+      disabled={disabled || !credential}
+      editable={true}
+      overlayContent={overlayContent}
+      isLoading={loading}
+      error={error}
+      getDisplayName={getDisplayName}
+      renderOption={renderChannelOption}
+      onOpenChange={handleOpenChange}
+      emptyMessage={emptyMessage}
+      className={isForeignCredential ? 'cursor-help' : undefined}
+    />
   )
 }
