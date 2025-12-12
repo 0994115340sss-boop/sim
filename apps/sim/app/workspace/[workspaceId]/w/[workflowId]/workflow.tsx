@@ -70,7 +70,7 @@ const edgeTypes: EdgeTypes = {
 
 // Memoized ReactFlow props to prevent unnecessary re-renders
 const defaultEdgeOptions = { type: 'custom' }
-const snapGrid: [number, number] = [20, 20]
+const snapGrid: [number, number] = [50, 50]
 const reactFlowFitViewOptions = { padding: 0.6 } as const
 const reactFlowProOptions = { hideAttribution: true } as const
 
@@ -133,6 +133,9 @@ const WorkflowContent = React.memo(() => {
 
   // Get copilot cleanup function
   const copilotCleanup = useCopilotStore((state) => state.cleanup)
+
+  // Get snap to grid setting
+  const isSnapToGridEnabled = useGeneralStore((state) => state.isSnapToGridEnabled)
 
   // Handle copilot stream cleanup on page unload and component unmount
   useStreamCleanup(copilotCleanup)
@@ -2294,7 +2297,7 @@ const WorkflowContent = React.memo(() => {
           onNodeDrag={effectivePermissions.canEdit ? onNodeDrag : undefined}
           onNodeDragStop={effectivePermissions.canEdit ? onNodeDragStop : undefined}
           onNodeDragStart={effectivePermissions.canEdit ? onNodeDragStart : undefined}
-          snapToGrid={false}
+          snapToGrid={isSnapToGridEnabled}
           snapGrid={snapGrid}
           elevateEdgesOnSelect={true}
           // Performance optimizations

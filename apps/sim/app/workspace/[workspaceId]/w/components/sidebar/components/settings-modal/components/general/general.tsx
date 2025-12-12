@@ -24,6 +24,7 @@ import { useProfilePictureUpload } from '@/app/workspace/[workspaceId]/w/compone
 import { useGeneralSettings, useUpdateGeneralSetting } from '@/hooks/queries/general-settings'
 import { useUpdateUserProfile, useUserProfile } from '@/hooks/queries/user-profile'
 import { clearUserData } from '@/stores'
+import { useGeneralStore } from '@/stores/settings/general/store'
 
 const logger = createLogger('General')
 
@@ -55,6 +56,9 @@ export function General({ onOpenChange }: GeneralProps) {
 
   const { data: settings, isLoading: isSettingsLoading } = useGeneralSettings()
   const updateSetting = useUpdateGeneralSetting()
+
+  const isSnapToGridEnabled = useGeneralStore((state) => state.isSnapToGridEnabled)
+  const setSettings = useGeneralStore((state) => state.setSettings)
 
   const isLoading = isProfileLoading || isSettingsLoading
 
@@ -230,6 +234,10 @@ export function General({ onOpenChange }: GeneralProps) {
     if (checked !== settings?.autoConnect && !updateSetting.isPending) {
       await updateSetting.mutateAsync({ key: 'autoConnect', value: checked })
     }
+  }
+
+  const handleSnapToGridChange = (checked: boolean) => {
+    setSettings({ isSnapToGridEnabled: checked })
   }
 
   const handleTrainingControlsChange = async (checked: boolean) => {
@@ -409,6 +417,15 @@ export function General({ onOpenChange }: GeneralProps) {
           checked={settings?.autoConnect ?? true}
           onCheckedChange={handleAutoConnectChange}
           disabled={updateSetting.isPending}
+        />
+      </div>
+
+      <div className='flex items-center justify-between'>
+        <Label htmlFor='snap-to-grid'>Snap to grid</Label>
+        <Switch
+          id='snap-to-grid'
+          checked={isSnapToGridEnabled}
+          onCheckedChange={handleSnapToGridChange}
         />
       </div>
 

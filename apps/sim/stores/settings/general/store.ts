@@ -13,6 +13,7 @@ const initialState: General = {
   telemetryEnabled: true,
   isBillingUsageNotificationsEnabled: true,
   isErrorNotificationsEnabled: true,
+  isSnapToGridEnabled: true,
 }
 
 export const useGeneralStore = create<GeneralStore>()(

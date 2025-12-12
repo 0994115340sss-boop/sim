@@ -6,6 +6,7 @@ export interface General {
   telemetryEnabled: boolean
   isBillingUsageNotificationsEnabled: boolean
   isErrorNotificationsEnabled: boolean
+  isSnapToGridEnabled: boolean
 }
 
 export interface GeneralStore extends General {
