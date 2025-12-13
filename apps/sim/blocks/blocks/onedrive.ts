@@ -92,10 +92,38 @@ export const OneDriveBlock: BlockConfig<OneDriveResponse> = {
       },
       wandConfig: {
         enabled: true,
-        prompt:
-          'Generate a JSON array of arrays that can be written directly into an Excel worksheet.',
+        maintainHistory: true,
+        prompt: `You are an expert at Excel data formatting. Generate JSON data for creating an Excel file in OneDrive.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.data>\`, \`<function1.result.rows>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of arrays. Do not include any explanations, markdown formatting, or comments.
+
+### DATA FORMAT
+Use array of arrays format where each inner array represents a row:
+[["Header1", "Header2"], ["Value1", "Value2"], ["Value3", "Value4"]]
+
+### EXAMPLES
+
+**Simple table**: "Create a table with names and emails"
+→ [["Name", "Email"], ["John Doe", "john@example.com"], ["Jane Smith", "jane@example.com"]]
+
+**With variables**: "Create table from previous block data"
+→ [["Name", "Status"], [<agent1.name>, <agent1.status>]]
+
+### REMEMBER
+Return ONLY valid JSON array of arrays - no explanations.`,
         placeholder: 'Describe the table you want to generate...',
-        generationType: 'json-object',
+        generationType: 'json-array',
       },
       required: false,
     },

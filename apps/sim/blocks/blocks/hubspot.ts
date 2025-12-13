@@ -126,6 +126,13 @@ export const HubSpotBlock: BlockConfig<HubSpotResponse> = {
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_OWNER_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
 ### CRITICAL INSTRUCTION
 Return ONLY the JSON object with HubSpot properties. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object that can be used directly in HubSpot API create/update operations.
 
@@ -311,6 +318,13 @@ Return ONLY the JSON object with properties - no explanations, no markdown, no e
 
 ### CONTEXT
 {context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.email>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_LIFECYCLE_STAGE}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
 
 ### CRITICAL INSTRUCTION
 Return ONLY the JSON array of filter groups. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array that can be used directly in HubSpot API search operations.

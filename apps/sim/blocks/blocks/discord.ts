@@ -131,6 +131,63 @@ export const DiscordBlock: BlockConfig<DiscordResponse> = {
         field: 'operation',
         value: ['discord_send_message', 'discord_edit_message', 'discord_execute_webhook'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Discord messages. Compose engaging messages using Discord's markdown formatting.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SERVER_NAME}}\`)
+
+### DISCORD MARKDOWN FORMATTING
+- **bold** with double asterisks
+- *italic* with single asterisks
+- __underline__ with double underscores
+- ~~strikethrough~~ with double tildes
+- \`inline code\` with backticks
+- \`\`\`code block\`\`\` with triple backticks
+- > quote with >
+- >>> multi-line quote with >>>
+- ||spoiler|| with double pipes
+
+### GUIDELINES
+1. **Tone**: Match community/server tone (casual, friendly, or professional)
+2. **Formatting**: Use markdown for emphasis
+3. **Emojis**: Use Discord emojis where appropriate
+4. **Length**: Discord has a 2000 character limit
+
+### EXAMPLES
+
+**Announcement**: "Announce a new feature"
+→ 🎉 **New Feature Alert!**
+
+We've just released a brand new feature that you're going to love!
+
+**What's New:**
+• Faster performance
+• Better UI
+• New customization options
+
+Check it out and let us know what you think!
+
+**With variables**: "Send alert message"
+→ ⚠️ **Alert**
+
+Status: <function1.status>
+Service: <agent1.service_name>
+
+Please check the dashboard for more details.
+
+### REMEMBER
+Use Discord markdown. Keep messages engaging and within 2000 characters.`,
+        placeholder: 'Describe the Discord message you want to send...',
+        generationType: 'message-content',
+      },
     },
     // Emoji - for reaction operations
     {

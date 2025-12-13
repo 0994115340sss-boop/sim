@@ -77,6 +77,46 @@ export const WebflowBlock: BlockConfig<WebflowResponse> = {
       placeholder: 'Field data as JSON: `{ "name": "Item Name", "slug": "item-slug" }`',
       condition: { field: 'operation', value: ['create', 'update'] },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Webflow developer. Generate field data JSON for Webflow CMS collection items.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.title>\`, \`<function1.result.slug>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SITE_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### FIELD DATA GUIDELINES
+1. **Required Fields**: name and slug are typically required
+2. **Custom Fields**: Match your collection's field types (text, rich text, image, reference, multi-reference, etc.)
+3. **Slug**: URL-friendly identifier (lowercase, hyphens instead of spaces)
+4. **References**: Use item IDs for reference fields
+
+### EXAMPLES
+
+**Basic item**: "Create a blog post"
+→ {"name": "My Blog Post", "slug": "my-blog-post", "content": "This is the post content..."}
+
+**With variables**: "Create item from previous block data"
+→ {"name": <agent1.title>, "slug": <agent1.slug>, "author": <agent1.author_id>, "published": true}
+
+**Rich content**: "Create product with details"
+→ {"name": "Premium Widget", "slug": "premium-widget", "price": 99.99, "description": "<p>High quality widget</p>", "featured": true}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the item data you want to create...',
+        generationType: 'json-object',
+      },
     },
     ...getTrigger('webflow_collection_item_created').subBlocks,
     ...getTrigger('webflow_collection_item_changed').subBlocks,

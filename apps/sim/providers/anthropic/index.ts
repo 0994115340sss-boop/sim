@@ -170,75 +170,20 @@ export const anthropicProvider: ProviderConfig = {
       }
     }
 
-    // If response format is specified, add strict formatting instructions
-    if (request.responseFormat) {
-      // Get the schema from the response format
-      const schema = request.responseFormat.schema || request.responseFormat
+    // Anthropic's structured outputs require the beta API and specific models
+    const useNativeStructuredOutputs = !!(
+      request.responseFormat &&
+      (request.responseFormat.schema || request.responseFormat)
+    )
 
-      // Build a system prompt for structured output based on the JSON schema
-      let schemaInstructions = ''
+    // Get the schema for structured outputs
+    const outputSchema = request.responseFormat?.schema || request.responseFormat
 
-      if (schema?.properties) {
-        // Create a template of the expected JSON structure
-        const jsonTemplate = Object.entries(schema.properties).reduce(
-          (acc: Record<string, any>, [key, prop]: [string, any]) => {
-            let exampleValue
-            const propType = prop.type || 'string'
-
-            // Generate appropriate example values based on type
-            switch (propType) {
-              case 'string':
-                exampleValue = '"value"'
-                break
-              case 'number':
-                exampleValue = '0'
-                break
-              case 'boolean':
-                exampleValue = 'true'
-                break
-              case 'array':
-                exampleValue = '[]'
-                break
-              case 'object':
-                exampleValue = '{}'
-                break
-              default:
-                exampleValue = '"value"'
-            }
-
-            acc[key] = exampleValue
-            return acc
-          },
-          {}
-        )
-
-        // Generate field descriptions
-        const fieldDescriptions = Object.entries(schema.properties)
-          .map(([key, prop]: [string, any]) => {
-            const type = prop.type || 'string'
-            const description = prop.description ? `: ${prop.description}` : ''
-            return `${key} (${type})${description}`
-          })
-          .join('\n')
-
-        // Format the JSON template as a string
-        const jsonTemplateStr = JSON.stringify(jsonTemplate, null, 2)
-
-        schemaInstructions = `
-IMPORTANT RESPONSE FORMAT INSTRUCTIONS:
-1. Your response must be EXACTLY in this format, with no additional fields:
-${jsonTemplateStr}
-
-Field descriptions:
-${fieldDescriptions}
-
-2. DO NOT include any explanatory text before or after the JSON
-3. DO NOT wrap the response in an array
-4. DO NOT add any fields not specified in the schema
-5. Your response MUST be valid JSON and include all the specified fields with their correct types`
-      }
-
-      systemPrompt = `${systemPrompt}${schemaInstructions}`
+    if (useNativeStructuredOutputs) {
+      logger.info('Using Anthropic native structured outputs', {
+        hasSchema: !!outputSchema,
+        schemaProperties: outputSchema?.properties ? Object.keys(outputSchema.properties) : [],
+      })
     }
 
     // Build the request payload
@@ -262,6 +207,47 @@ ${fieldDescriptions}
     // Check if we should stream tool calls (default: false for chat, true for copilot)
     const shouldStreamToolCalls = request.streamToolCalls ?? false
 
+    /**
+     * Helper function to make Anthropic API calls with optional structured outputs support.
+     * Uses the beta API when structured outputs are requested.
+     */
+    const makeAnthropicRequest = async (requestPayload: any, streaming = false) => {
+      if (useNativeStructuredOutputs && outputSchema) {
+        // Ensure the schema has additionalProperties: false (required by Anthropic)
+        const preparedSchema = {
+          ...outputSchema,
+          additionalProperties: false,
+        }
+
+        // Use beta API with structured outputs
+        const betaPayload = {
+          ...requestPayload,
+          betas: ['structured-outputs-2025-11-13'],
+          output_format: {
+            type: 'json_schema',
+            schema: preparedSchema,
+          },
+          stream: streaming,
+        }
+
+        logger.info('Making Anthropic beta API call with structured outputs', {
+          model: betaPayload.model,
+          hasOutputFormat: true,
+          streaming,
+          schemaType: preparedSchema.type,
+          schemaProperties: preparedSchema.properties ? Object.keys(preparedSchema.properties) : [],
+        })
+
+        return anthropic.beta.messages.create(betaPayload)
+      }
+
+      // Use regular API
+      return anthropic.messages.create({
+        ...requestPayload,
+        stream: streaming,
+      })
+    }
+
     // EARLY STREAMING: if caller requested streaming and there are no tools to execute,
     // we can directly stream the completion.
     if (request.stream && (!anthropicTools || anthropicTools.length === 0)) {
@@ -272,10 +258,7 @@ ${fieldDescriptions}
       const providerStartTimeISO = new Date(providerStartTime).toISOString()
 
       // Create a streaming request
-      const streamResponse: any = await anthropic.messages.create({
-        ...payload,
-        stream: true,
-      })
+      const streamResponse: any = await makeAnthropicRequest(payload, true)
 
       // Start collecting token usage
       const tokenUsage = {
@@ -348,8 +331,14 @@ ${fieldDescriptions}
         const forcedTools = preparedTools?.forcedTools || []
         let usedForcedTools: string[] = []
 
-        let currentResponse = await anthropic.messages.create(payload)
+        let currentResponse = (await makeAnthropicRequest(payload, false)) as Anthropic.Message
         const firstResponseTime = Date.now() - initialCallTime
+
+        logger.info('Anthropic initial response received', {
+          stopReason: currentResponse.stop_reason,
+          contentTypes: currentResponse.content.map((c) => c.type),
+          hasStructuredOutput: useNativeStructuredOutputs,
+        })
 
         let content = ''
 
@@ -573,7 +562,7 @@ ${fieldDescriptions}
             const nextModelStartTime = Date.now()
 
             // Make the next request
-            currentResponse = await anthropic.messages.create(nextPayload)
+            currentResponse = (await makeAnthropicRequest(nextPayload, false)) as Anthropic.Message
 
             // Check if any forced tools were used in this response
             checkForForcedToolUsage(currentResponse, nextPayload.tool_choice)
@@ -619,8 +608,12 @@ ${fieldDescriptions}
           throw error
         }
 
-        // If the content looks like it contains JSON, extract just the JSON part
-        if (content.includes('{') && content.includes('}')) {
+        if (useNativeStructuredOutputs) {
+          logger.info('Anthropic structured output content', {
+            contentLength: content.length,
+            contentPreview: content.substring(0, 200),
+          })
+        } else if (content.includes('{') && content.includes('}')) {
           try {
             const jsonMatch = content.match(/\{[\s\S]*\}/m)
             if (jsonMatch) {
@@ -703,8 +696,14 @@ ${fieldDescriptions}
       const forcedTools = preparedTools?.forcedTools || []
       let usedForcedTools: string[] = []
 
-      let currentResponse = await anthropic.messages.create(payload)
+      let currentResponse = (await makeAnthropicRequest(payload, false)) as Anthropic.Message
       const firstResponseTime = Date.now() - initialCallTime
+
+      logger.info('Anthropic initial response received (non-streaming path)', {
+        stopReason: currentResponse.stop_reason,
+        contentTypes: currentResponse.content.map((c) => c.type),
+        hasStructuredOutput: useNativeStructuredOutputs,
+      })
 
       let content = ''
 
@@ -923,7 +922,7 @@ ${fieldDescriptions}
           const nextModelStartTime = Date.now()
 
           // Make the next request
-          currentResponse = await anthropic.messages.create(nextPayload)
+          currentResponse = (await makeAnthropicRequest(nextPayload, false)) as Anthropic.Message
 
           // Check if any forced tools were used in this response
           checkForForcedToolUsage(currentResponse, nextPayload.tool_choice)
@@ -968,8 +967,12 @@ ${fieldDescriptions}
         throw error
       }
 
-      // If the content looks like it contains JSON, extract just the JSON part
-      if (content.includes('{') && content.includes('}')) {
+      if (useNativeStructuredOutputs) {
+        logger.info('Anthropic structured output content (non-streaming path)', {
+          contentLength: content.length,
+          contentPreview: content.substring(0, 200),
+        })
+      } else if (content.includes('{') && content.includes('}')) {
         try {
           const jsonMatch = content.match(/\{[\s\S]*\}/m)
           if (jsonMatch) {
@@ -995,13 +998,12 @@ ${fieldDescriptions}
           ...payload,
           messages: currentMessages,
           // For Anthropic, omit tool_choice entirely rather than setting it to 'none'
-          stream: true,
         }
 
         // Remove the tool_choice parameter as Anthropic doesn't accept 'none' as a string value
         streamingPayload.tool_choice = undefined
 
-        const streamResponse: any = await anthropic.messages.create(streamingPayload)
+        const streamResponse: any = await makeAnthropicRequest(streamingPayload, true)
 
         // Create a StreamingExecution response with all collected data
         const streamingResult = {

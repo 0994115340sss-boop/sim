@@ -74,6 +74,60 @@ export const GoogleCalendarBlock: BlockConfig<GoogleCalendarResponse> = {
       type: 'long-input',
       placeholder: 'Event description',
       condition: { field: 'operation', value: 'create' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing calendar event descriptions. Create clear, informative event details.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.agenda>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{MEETING_LINK}}\`)
+
+### GUIDELINES
+1. **Purpose**: Clearly state the meeting purpose
+2. **Agenda**: Include key discussion points
+3. **Preparation**: Note any required preparation
+4. **Links**: Include relevant meeting links and documents
+5. **Contact**: Add organizer contact if needed
+
+### EXAMPLES
+
+**Team meeting**: "Write description for weekly team sync"
+→ Weekly Team Sync
+
+Agenda:
+• Project status updates
+• Blockers and dependencies
+• Upcoming deadlines
+• Open discussion
+
+Meeting Link: {{MEETING_LINK}}
+
+Please come prepared with your updates for the week.
+
+**With variables**: "Create event from request"
+→ <agent1.meeting_title>
+
+Purpose: <agent1.purpose>
+
+Attendees: <function1.attendees>
+
+Agenda:
+<agent1.agenda_items>
+
+Documents: <function1.doc_links>
+
+Questions? Contact <agent1.organizer_email>
+
+### REMEMBER
+Be concise. Include all necessary details for attendees.`,
+        placeholder: 'Describe the event details...',
+        generationType: 'markdown-content',
+      },
     },
     {
       id: 'location',

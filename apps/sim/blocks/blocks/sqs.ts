@@ -73,6 +73,61 @@ export const SQSBlock: BlockConfig<SqsResponse> = {
       placeholder: '{\n  "name": "John Doe",\n  "email": "john@example.com",\n  "active": true\n}',
       condition: { field: 'operation', value: 'send' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert AWS SQS developer. Generate JSON message data for SQS queue messages.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.order>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SERVICE_NAME}}\`, \`{{ENVIRONMENT}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON data. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### MESSAGE GUIDELINES
+1. **Structure**: Use a clear, consistent structure for your messages
+2. **Event Type**: Consider including a message type or event type field
+3. **Timestamp**: Include timestamps when relevant
+4. **IDs**: Include correlation IDs for tracking
+
+### EXAMPLES
+
+**User event**: "Send user registration event"
+→ {
+  "eventType": "user.registered",
+  "userId": "user-123",
+  "email": "john@example.com",
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+
+**With variables**: "Send event with data from previous block"
+→ {
+  "eventType": "order.processed",
+  "orderId": <agent1.order_id>,
+  "customerId": <function1.customer_id>,
+  "environment": "{{ENVIRONMENT}}"
+}
+
+**Task message**: "Send background job to process"
+→ {
+  "jobType": "process_report",
+  "reportId": "report-123",
+  "parameters": {"format": "pdf", "dateRange": "last_30_days"},
+  "priority": "high"
+}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the message data you want to send...',
+        generationType: 'json-object',
+      },
     },
   ],
   tools: {

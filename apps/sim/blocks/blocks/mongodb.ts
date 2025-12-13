@@ -101,6 +101,13 @@ export const MongoDBBlock: BlockConfig<MongoDBResponse> = {
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
 ### CRITICAL INSTRUCTION
 Return ONLY the MongoDB query filter as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object that can be used directly in a MongoDB find() operation.
 
@@ -223,6 +230,13 @@ Return ONLY the MongoDB query filter as valid JSON - no explanations, no markdow
 
 ### CONTEXT
 {context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.status>\`, \`<function1.result.limit>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_LIMIT}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
 
 ### CRITICAL INSTRUCTION
 Return ONLY the aggregation pipeline as a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
@@ -464,10 +478,13 @@ Return ONLY the JSON array pipeline - no explanations, no markdown, no extra tex
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+
 ### EXAMPLES
 Newest first: {"createdAt": -1}
 Alphabetical: {"name": 1}
-Multiple fields: {"category": 1, "price": -1}
+Dynamic field: {<agent1.sort_field>: <agent1.sort_order>}
 
 Use 1 for ascending, -1 for descending. Return ONLY valid JSON.`,
         placeholder: 'Describe how you want to sort the results...',
@@ -489,9 +506,13 @@ Use 1 for ascending, -1 for descending. Return ONLY valid JSON.`,
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
 ### EXAMPLES
 Simple user: [{"name": "John Doe", "email": "john@example.com", "active": true}]
-With nested data: [{"user": {"name": "Jane", "profile": {"age": 25, "city": "NYC"}}, "status": "active"}]
+With variables: [{"name": <agent1.name>, "email": <agent1.email>, "source": "{{DATA_SOURCE}}"}]
 Multiple docs: [{"name": "User1", "type": "admin"}, {"name": "User2", "type": "user"}]
 
 Return ONLY valid JSON array - no explanations.`,
@@ -513,6 +534,11 @@ Return ONLY valid JSON array - no explanations.`,
 
 ### CONTEXT
 {context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
 
 ### CRITICAL INSTRUCTION
 Return ONLY the MongoDB query filter as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object that will identify which documents to update.
@@ -704,6 +730,11 @@ Generate the MongoDB update operation that safely and accurately fulfills the us
 
 ### CONTEXT
 {context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
 
 ### CRITICAL INSTRUCTION
 Return ONLY the MongoDB query filter as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object that will identify which documents to delete.

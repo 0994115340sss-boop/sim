@@ -44,6 +44,51 @@ export const Mem0Block: BlockConfig<Mem0Response> = {
         value: 'add',
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at creating Mem0 memory messages. Generate a JSON array of message objects for storing memories.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.content>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{USER_NAME}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of message objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### MESSAGE STRUCTURE
+Each message must have:
+- **role**: Either "user" or "assistant"
+- **content**: The message text/content
+
+### EXAMPLES
+
+**Single user memory**: "Remember that the user's favorite color is blue"
+→ [{"role": "user", "content": "My favorite color is blue"}]
+
+**With variables**: "Store the conversation from previous agent"
+→ [
+  {"role": "user", "content": <agent1.user_message>},
+  {"role": "assistant", "content": <agent1.response>}
+]
+
+**Multiple facts**: "Remember user likes coffee and works remotely"
+→ [
+  {"role": "user", "content": "I love drinking coffee every morning"},
+  {"role": "user", "content": "I work remotely from home"}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array of message objects - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the memories you want to store...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'query',

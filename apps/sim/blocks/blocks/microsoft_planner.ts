@@ -245,6 +245,44 @@ export const MicrosoftPlannerBlock: BlockConfig<MicrosoftPlannerResponse> = {
       type: 'long-input',
       placeholder: 'Enter checklist as JSON object (optional)',
       condition: { field: 'operation', value: ['update_task_details'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Microsoft Planner developer. Generate checklist JSON for Planner task details.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.item_title>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### CHECKLIST FORMAT
+Microsoft Planner checklists use a specific JSON format where each item has a unique key (typically a GUID):
+{
+  "item-id-1": {"@odata.type": "#microsoft.graph.plannerChecklistItem", "title": "Item 1", "isChecked": false},
+  "item-id-2": {"@odata.type": "#microsoft.graph.plannerChecklistItem", "title": "Item 2", "isChecked": true}
+}
+
+### EXAMPLES
+
+**Simple checklist**: "Add two items - Review code and Write tests"
+→ {"item1": {"@odata.type": "#microsoft.graph.plannerChecklistItem", "title": "Review code", "isChecked": false}, "item2": {"@odata.type": "#microsoft.graph.plannerChecklistItem", "title": "Write tests", "isChecked": false}}
+
+**With variables**: "Add items from previous block"
+→ {"item1": {"@odata.type": "#microsoft.graph.plannerChecklistItem", "title": <agent1.task_item>, "isChecked": false}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the checklist items...',
+        generationType: 'json-object',
+      },
     },
 
     // References for task details
@@ -254,6 +292,41 @@ export const MicrosoftPlannerBlock: BlockConfig<MicrosoftPlannerResponse> = {
       type: 'long-input',
       placeholder: 'Enter references as JSON object (optional)',
       condition: { field: 'operation', value: ['update_task_details'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Microsoft Planner developer. Generate references JSON for Planner task details.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.url>\`, \`<function1.result.link>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DOCS_BASE_URL}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### REFERENCES FORMAT
+Microsoft Planner references use URL-encoded keys pointing to the reference URL:
+{
+  "https%3A//example%2Ecom/doc": {"@odata.type": "#microsoft.graph.plannerExternalReference", "alias": "Doc Name", "type": "Other"},
+  "https%3A//github%2Ecom/repo": {"@odata.type": "#microsoft.graph.plannerExternalReference", "alias": "GitHub Repo", "type": "Other"}
+}
+
+Note: The key must be URL-encoded (: becomes %3A, . becomes %2E, / becomes %2F)
+
+### EXAMPLES
+
+**Add document link**: "Link to documentation"
+→ {"https%3A%2F%2Fdocs%2Eexample%2Ecom%2Fguide": {"@odata.type": "#microsoft.graph.plannerExternalReference", "alias": "User Guide", "type": "Other"}}
+
+### REMEMBER
+Return ONLY valid JSON with URL-encoded keys - no explanations.`,
+        placeholder: 'Describe the references to add...',
+        generationType: 'json-object',
+      },
     },
 
     // Preview Type

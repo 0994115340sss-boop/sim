@@ -256,6 +256,47 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "John Doe",\n  "email": "john@example.com",\n  "active": true\n}',
       condition: { field: 'operation', value: 'insert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert MySQL developer. Generate JSON data for INSERT operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.content>\`, \`<function1.result.id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{API_KEY}}\`, \`{{DATABASE_NAME}}\`)
+
+Do NOT wrap variable references in quotes - they will be resolved before execution.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### DATA GUIDELINES
+1. **Structure**: Use field-value pairs matching your table columns
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Required Fields**: Include all required (NOT NULL) columns
+5. **MySQL Types**: Use 1/0 or true/false for booleans, ISO date strings for dates
+
+### EXAMPLES
+
+**Simple insert**: "Insert user with name, email, and active status"
+→ {"name": "John Doe", "email": "john@example.com", "active": true}
+
+**With variables**: "Insert user data from previous agent block"
+→ {"name": <agent1.name>, "email": <agent1.email>, "created_by": "{{SYSTEM_USER}}"}
+
+**With dates**: "Insert order with customer_id, total, and order_date"
+→ {"customer_id": 123, "total": 99.99, "order_date": "2024-01-15"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to insert...',
+        generationType: 'json-object',
+      },
     },
     // Set clause for updates
     {
@@ -265,6 +306,46 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "Jane Doe",\n  "email": "jane@example.com"\n}',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert MySQL developer. Generate JSON data for UPDATE operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.content>\`, \`<function1.result.id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{API_KEY}}\`, \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes - they will be resolved before execution.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object containing only the fields to update.
+
+### DATA GUIDELINES
+1. **Structure**: Include only the fields you want to update
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Partial Updates**: You don't need to include all columns, only those being changed
+
+### EXAMPLES
+
+**Update single field**: "Update user's email"
+→ {"email": "newemail@example.com"}
+
+**With variables**: "Update user with data from previous block"
+→ {"email": <agent1.new_email>, "updated_at": <function1.timestamp>}
+
+**Set to null**: "Clear the user's phone number"
+→ {"phone": null}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the fields you want to update...',
+        generationType: 'json-object',
+      },
     },
     // Where clause for update/delete
     {

@@ -119,11 +119,78 @@ export const AsanaBlock: BlockConfig<AsanaResponse> = {
       id: 'notes',
       title: 'Task Notes',
       type: 'long-input',
-
       placeholder: 'Enter task notes or description',
       condition: {
         field: 'operation',
         value: ['create_task', 'update_task'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Asana task descriptions. Create clear, actionable task notes.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.details>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{PROJECT_NAME}}\`)
+
+### ASANA FORMATTING
+Asana supports rich text:
+- **bold** with double asterisks
+- _italic_ with underscores
+- Bullet points with -
+- Numbered lists with 1.
+- Links automatically detected
+
+### GUIDELINES
+1. **Clarity**: Be specific about what needs to be done
+2. **Context**: Include relevant background
+3. **Subtasks**: Break down complex tasks
+4. **Dependencies**: Note any blockers or dependencies
+5. **Resources**: Link to relevant documents or references
+
+### EXAMPLES
+
+**Task description**: "Write notes for implementing user authentication"
+→ **Objective**
+Implement user authentication using OAuth 2.0.
+
+**Requirements**
+- Support Google and GitHub OAuth providers
+- Implement token refresh mechanism
+- Add session management
+
+**Acceptance Criteria**
+- Users can sign in with Google
+- Users can sign in with GitHub
+- Sessions persist across browser restarts
+- Token refresh works automatically
+
+**Resources**
+- Design doc: [link]
+- API specs: [link]
+
+**With variables**: "Create task from request"
+→ **Request Details**
+- Submitted by: <agent1.user_name>
+- Priority: <function1.priority>
+- Due: <function1.due_date>
+
+**Description**
+<agent1.request_description>
+
+**Next Steps**
+- Review requirements
+- Create implementation plan
+- Schedule kickoff meeting
+
+### REMEMBER
+Be specific and actionable. Include acceptance criteria when relevant.`,
+        placeholder: 'Describe the task notes...',
+        generationType: 'markdown-content',
       },
     },
     {

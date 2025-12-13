@@ -26,6 +26,7 @@ export type GenerationType =
   | 'typescript-function-body'
   | 'json-schema'
   | 'json-object'
+  | 'json-array'
   | 'system-prompt'
   | 'custom-tool-schema'
   | 'sql-query'
@@ -37,6 +38,15 @@ export type GenerationType =
   | 'mongodb-update'
   | 'neo4j-cypher'
   | 'neo4j-parameters'
+  | 'elasticsearch-query'
+  | 'elasticsearch-sort'
+  | 'elasticsearch-bulk'
+  | 'elasticsearch-mapping'
+  | 'email-content'
+  | 'message-content'
+  | 'markdown-content'
+  | 'html-content'
+  | 'social-post'
 
 export type SubBlockType =
   | 'short-input' // Single line input

@@ -108,6 +108,51 @@ export const SSHBlock: BlockConfig<SSHResponse> = {
       placeholder: 'ls -la /var/www',
       required: true,
       condition: { field: 'operation', value: 'ssh_execute_command' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Linux/Unix system administrator. Generate shell commands based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.filename>\`, \`<function1.result.path>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{APP_PATH}}\`, \`{{USER}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY the shell command(s). Do not include any explanations, markdown formatting, or comments outside the command.
+
+### COMMAND GUIDELINES
+1. **Single Command**: For simple operations, return just the command
+2. **Multiple Commands**: Chain with && or ; as appropriate
+3. **Variables**: Use proper shell variable syntax when needed
+4. **Safety**: Prefer safe commands; avoid rm -rf without careful consideration
+5. **Quoting**: Use proper quoting for paths with spaces
+
+### EXAMPLES
+
+**List files**: "List all files in /var/www"
+→ ls -la /var/www
+
+**Check disk space**: "Show disk usage for /home"
+→ df -h /home && du -sh /home/*
+
+**Find files**: "Find all .log files larger than 100MB"
+→ find /var/log -name "*.log" -size +100M
+
+**Service management**: "Restart nginx and check status"
+→ sudo systemctl restart nginx && sudo systemctl status nginx
+
+**With variables**: "Create directory from previous block"
+→ mkdir -p <agent1.directory_path>
+
+### REMEMBER
+Return ONLY the command - no explanations.`,
+        placeholder: 'Describe what you want to do on the server...',
+        generationType: 'javascript-function-body',
+      },
     },
     {
       id: 'workingDirectory',
@@ -125,6 +170,61 @@ export const SSHBlock: BlockConfig<SSHResponse> = {
       placeholder: '#!/bin/bash\necho "Hello World"',
       required: true,
       condition: { field: 'operation', value: 'ssh_execute_script' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Linux/Unix shell script developer. Generate shell scripts based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.filename>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{APP_PATH}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY the shell script. Do not include any explanations outside the script. Comments inside the script are fine.
+
+### SCRIPT GUIDELINES
+1. **Shebang**: Start with #!/bin/bash (or appropriate interpreter)
+2. **Error Handling**: Use set -e for strict error handling when appropriate
+3. **Variables**: Quote variables properly to handle spaces
+4. **Exit Codes**: Return appropriate exit codes
+5. **Comments**: Add brief comments for complex operations
+
+### EXAMPLES
+
+**Simple script**: "Print system info"
+→ #!/bin/bash
+echo "Hostname: $(hostname)"
+echo "Uptime: $(uptime)"
+echo "Disk Usage:"
+df -h
+
+**Backup script**: "Backup a directory to /backup"
+→ #!/bin/bash
+set -e
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+SOURCE="/var/www/html"
+DEST="/backup/www_$TIMESTAMP.tar.gz"
+tar -czf "$DEST" "$SOURCE"
+echo "Backup created: $DEST"
+
+**Deploy script**: "Pull latest code and restart service"
+→ #!/bin/bash
+set -e
+cd /var/www/app
+git pull origin main
+npm install
+sudo systemctl restart app
+echo "Deployment complete"
+
+### REMEMBER
+Return ONLY the script - no explanations outside the script.`,
+        placeholder: 'Describe the script you need...',
+        generationType: 'javascript-function-body',
+      },
     },
     {
       id: 'interpreter',

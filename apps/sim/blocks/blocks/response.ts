@@ -49,24 +49,35 @@ export const ResponseBlock: BlockConfig<ResponseBlockOutput> = {
       wandConfig: {
         enabled: true,
         maintainHistory: true,
-        prompt: `You are an expert JSON programmer.
-Generate ONLY the raw JSON object based on the user's request.
-The output MUST be a single, valid JSON object, starting with { and ending with }.
+        prompt: `You are an expert JSON programmer. Generate ONLY the raw JSON object for the API response.
 
-Current response: {context}
+### CONTEXT
+{context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.response>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{API_VERSION}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. The output MUST be a single, valid JSON object, starting with { and ending with }.
 Do not include any explanations, markdown formatting, or other text outside the JSON object.
 
-You have access to the following variables you can use to generate the JSON body:
-- 'params' (object): Contains input parameters derived from the JSON schema. Access these directly using the parameter name wrapped in angle brackets, e.g., '<paramName>'. Do NOT use 'params.paramName'.
-- 'environmentVariables' (object): Contains environment variables. Reference these using the double curly brace syntax: '{{ENV_VAR_NAME}}'. Do NOT use 'environmentVariables.VAR_NAME' or env.
+### EXAMPLES
 
-Example:
-{
-  "name": "<block.agent.response.content>",
-  "age": <block.function.output.age>,
-  "success": true
-}`,
+**Simple response**: "Return success with message"
+→ {"success": true, "message": "Operation completed"}
+
+**With variables**: "Return processed data from agent"
+→ {"status": "success", "data": <agent1.result>, "processedAt": <function1.timestamp>}
+
+**Error response**: "Return error with details"
+→ {"success": false, "error": {"code": "NOT_FOUND", "message": <agent1.error_message>}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown.`,
         placeholder: 'Describe the API response structure you need...',
         generationType: 'json-object',
       },

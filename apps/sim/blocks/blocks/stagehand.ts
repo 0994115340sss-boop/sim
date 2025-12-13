@@ -95,6 +95,9 @@ The JSON object MUST have the following top-level properties: 'name' (string), '
 The 'schema' object must define the structure and MUST contain 'type': 'object', 'properties': {...}, 'additionalProperties': false, and 'required': [...].
 Inside 'properties', use standard JSON Schema properties (type, description, enum, items for arrays, etc.).
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax for dynamic schema names or descriptions.
+
 Current schema: {context}
 
 Do not include any explanations, markdown formatting, or other text outside the JSON object.

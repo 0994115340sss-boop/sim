@@ -124,6 +124,51 @@ export const PineconeBlock: BlockConfig<PineconeResponse> = {
       type: 'long-input',
       placeholder: '{"category": "product"}',
       condition: { field: 'operation', value: 'search_text' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Pinecone developer. Generate Pinecone metadata filter JSON based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.category>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_CATEGORY}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON filter. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### PINECONE FILTER SYNTAX
+Pinecone uses metadata filters with these operators:
+- **$eq**: Equals
+- **$ne**: Not equals
+- **$gt**: Greater than
+- **$gte**: Greater than or equal
+- **$lt**: Less than
+- **$lte**: Less than or equal
+- **$in**: In array
+- **$nin**: Not in array
+
+### EXAMPLES
+
+**Simple equality**: "Filter by category product"
+→ {"category": "product"}
+
+**With variables**: "Filter by category from previous block"
+→ {"category": <agent1.selected_category>, "user_id": "{{USER_ID}}"}
+
+**Comparison**: "Filter records with price greater than 100"
+→ {"price": {"$gt": 100}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the filter conditions...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'rerank',
@@ -131,6 +176,42 @@ export const PineconeBlock: BlockConfig<PineconeResponse> = {
       type: 'long-input',
       placeholder: '{"model": "bge-reranker-v2-m3", "rank_fields": ["text"], "top_n": 2}',
       condition: { field: 'operation', value: 'search_text' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Pinecone developer. Generate Pinecone rerank configuration JSON based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.top_n>\`, \`<function1.result.fields>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{RERANK_MODEL}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON rerank options. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### RERANK OPTIONS STRUCTURE
+- **model**: Reranker model (e.g., "bge-reranker-v2-m3")
+- **rank_fields**: Array of field names to use for reranking
+- **top_n**: Number of top results to return after reranking
+
+### EXAMPLES
+
+**Basic rerank**: "Rerank top 5 results using text field"
+→ {"model": "bge-reranker-v2-m3", "rank_fields": ["text"], "top_n": 5}
+
+**With variables**: "Use dynamic top_n from previous block"
+→ {"model": "bge-reranker-v2-m3", "rank_fields": ["text"], "top_n": <agent1.result_count>}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the reranking options...',
+        generationType: 'json-object',
+      },
     },
     // Fetch fields
     {

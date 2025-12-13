@@ -64,6 +64,56 @@ export const TelegramBlock: BlockConfig<TelegramResponse> = {
       placeholder: 'Enter the message to send',
       required: true,
       condition: { field: 'operation', value: 'telegram_message' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Telegram messages. Compose clear, engaging messages.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_name>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{BOT_NAME}}\`)
+
+### TELEGRAM FORMATTING (MarkdownV2)
+- *bold* with asterisks
+- _italic_ with underscores
+- __underline__ with double underscores
+- ~strikethrough~ with tildes
+- ||spoiler|| with double pipes
+- \`inline code\` with backticks
+- \`\`\`code block\`\`\` with triple backticks
+
+### GUIDELINES
+1. **Tone**: Adapt to context (bot notifications, alerts, updates)
+2. **Brevity**: Keep messages concise for mobile readability
+3. **Emojis**: Use emojis for visual clarity
+4. **Structure**: Use line breaks for readability
+
+### EXAMPLES
+
+**Notification**: "Send a task reminder"
+→ 📋 *Task Reminder*
+
+Don't forget to complete your daily review!
+
+⏰ Due: Today at 5 PM
+
+**With variables**: "Send order update"
+→ 📦 *Order Update*
+
+Order: #<function1.order_id>
+Status: <agent1.status>
+
+Your order is on its way! 🚀
+
+### REMEMBER
+Keep messages mobile-friendly and concise.`,
+        placeholder: 'Describe the Telegram message you want to send...',
+        generationType: 'message-content',
+      },
     },
     {
       id: 'photo',

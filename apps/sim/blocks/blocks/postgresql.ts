@@ -115,6 +115,13 @@ export const PostgreSQLBlock: BlockConfig<PostgresResponse> = {
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{TABLE_PREFIX}}\`)
+
+Variables will be resolved before query execution. For safety, prefer using parameterized values.
+
 ### CRITICAL INSTRUCTION
 Return ONLY the SQL query. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw SQL query.
 
@@ -190,6 +197,13 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{TABLE_PREFIX}}\`)
+
+Variables will be resolved before query execution. For safety, prefer using parameterized values.
+
 ### CRITICAL INSTRUCTION
 Return ONLY the SQL query. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw SQL query.
 
@@ -258,6 +272,47 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "John Doe",\n  "email": "john@example.com",\n  "active": true\n}',
       condition: { field: 'operation', value: 'insert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert PostgreSQL developer. Generate JSON data for INSERT operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### DATA GUIDELINES
+1. **Structure**: Use field-value pairs matching your table columns
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Required Fields**: Include all required (NOT NULL) columns
+5. **PostgreSQL**: Use true/false for booleans, ISO date strings for dates
+
+### EXAMPLES
+
+**Simple insert**: "Insert user with name, email, and active status"
+→ {"name": "John Doe", "email": "john@example.com", "active": true}
+
+**With variables**: "Insert user from previous block data"
+→ {"name": <agent1.name>, "email": <agent1.email>, "created_by": "{{SYSTEM_USER}}"}
+
+**With dates**: "Insert order with customer_id, total, and order_date"
+→ {"customer_id": 123, "total": 99.99, "order_date": "2024-01-15"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to insert...',
+        generationType: 'json-object',
+      },
     },
     // Set clause for updates
     {
@@ -267,6 +322,47 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "Jane Doe",\n  "email": "jane@example.com"\n}',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert PostgreSQL developer. Generate JSON data for UPDATE operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.new_status>\`, \`<function1.result.price>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the update data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object with only the fields you want to update.
+
+### UPDATE DATA GUIDELINES
+1. **Partial Updates**: Only include fields that need to be updated
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Null Values**: Use null to set fields to NULL
+5. **PostgreSQL**: Use true/false for booleans, ISO date strings for dates
+
+### EXAMPLES
+
+**Simple update**: "Update name and email"
+→ {"name": "Jane Doe", "email": "jane@example.com"}
+
+**With variables**: "Update fields from previous block"
+→ {"status": <agent1.new_status>, "updated_by": "{{SYSTEM_USER}}"}
+
+**Single field**: "Update status to active"
+→ {"status": "active"}
+
+### REMEMBER
+Return ONLY valid JSON with fields to update - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what fields you want to update...',
+        generationType: 'json-object',
+      },
     },
     // Where clause for update/delete
     {

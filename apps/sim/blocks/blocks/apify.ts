@@ -46,6 +46,62 @@ export const ApifyBlock: BlockConfig<RunActorResult> = {
       language: 'json',
       placeholder: '{\n  "startUrl": "https://example.com",\n  "maxPages": 10\n}',
       required: false,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Apify developer. Generate JSON input for Apify actors based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.url>\`, \`<function1.result.query>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{APIFY_PROXY_PASSWORD}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON input for the Apify actor. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### COMMON APIFY ACTOR INPUT PATTERNS
+
+**Web Scraping Actors**:
+- startUrls: Array of URLs to start scraping from
+- maxRequestsPerCrawl: Maximum number of pages to scrape
+- proxyConfiguration: Proxy settings
+
+**E-commerce Scrapers**:
+- searchTerms: Array of search queries
+- maxItems: Maximum products to return
+- categoryUrls: URLs of categories to scrape
+
+**Social Media Scrapers**:
+- handles: Array of usernames/handles
+- resultsLimit: Maximum posts/items to return
+- startDate/endDate: Date range filters
+
+### EXAMPLES
+
+**Web scraper**: "Scrape product pages from example.com, max 50 pages"
+→ {
+  "startUrls": [{"url": "https://example.com/products"}],
+  "maxRequestsPerCrawl": 50,
+  "proxyConfiguration": {"useApifyProxy": true}
+}
+
+**With variables**: "Scrape URL from previous block"
+→ {
+  "startUrls": [{"url": <agent1.target_url>}],
+  "maxRequestsPerCrawl": <function1.max_pages>,
+  "proxyConfiguration": {"useApifyProxy": true}
+}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the input for the Apify actor...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'timeout',

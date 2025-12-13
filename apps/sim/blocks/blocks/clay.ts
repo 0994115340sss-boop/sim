@@ -30,6 +30,47 @@ export const ClayBlock: BlockConfig<ClayPopulateResponse> = {
 JSON: Best for populating multiple columns.
 Plain Text: Best for populating a table in free-form style.
       `,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Clay developer. Generate data to populate a Clay workbook table.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_SOURCE}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON or plain text data. Do not include any explanations, markdown formatting, or comments.
+
+### DATA GUIDELINES
+1. **JSON Format**: Best for structured data with multiple columns
+   - Use objects for single rows: {"column1": "value1", "column2": "value2"}
+   - Use arrays for multiple rows: [{"col1": "val1"}, {"col1": "val2"}]
+2. **Plain Text**: Best for free-form single column data
+3. **Column Names**: Should match your Clay table column names
+
+### EXAMPLES
+
+**Single record**: "Add a lead with name and email"
+→ {"name": "John Doe", "email": "john@example.com", "company": "Acme Inc"}
+
+**Multiple records**: "Add multiple leads"
+→ [{"name": "John", "email": "john@example.com"}, {"name": "Jane", "email": "jane@example.com"}]
+
+**With variables**: "Populate with data from previous block"
+→ {"name": <agent1.name>, "email": <agent1.email>, "source": "{{DEFAULT_SOURCE}}"}
+
+### REMEMBER
+Return ONLY the data - no explanations.`,
+        placeholder: 'Describe the data you want to populate...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'authToken',

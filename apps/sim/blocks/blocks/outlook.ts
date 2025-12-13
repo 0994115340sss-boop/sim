@@ -94,6 +94,53 @@ export const OutlookBlock: BlockConfig<OutlookResponse> = {
       placeholder: 'Email content',
       condition: { field: 'operation', value: ['send_outlook', 'draft_outlook'] },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert email writer. Compose professional, clear, and effective email content.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.customer_name>\`, \`<function1.result.details>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COMPANY_NAME}}\`)
+
+### GUIDELINES
+1. **Tone**: Match the appropriate tone (formal, friendly, urgent) based on context
+2. **Structure**: Use clear paragraphs, bullet points where helpful
+3. **Brevity**: Be concise but complete
+4. **Call to Action**: Include clear next steps when appropriate
+
+### EXAMPLES
+
+**Meeting request**: "Request a meeting to discuss Q4 planning"
+→ Hi,
+
+I'd like to schedule a meeting to discuss our Q4 planning and goals.
+
+Would you be available this week for a 30-minute call? I'm flexible on timing and can adjust to your schedule.
+
+Please let me know what works best for you.
+
+Thanks
+
+**With variables**: "Follow up on support ticket"
+→ Dear <agent1.customer_name>,
+
+Thank you for contacting us regarding ticket #<function1.ticket_id>.
+
+Our team has reviewed your request and we're working on a resolution. You can expect an update within 24 hours.
+
+Best regards,
+{{COMPANY_NAME}} Support
+
+### REMEMBER
+Write the email body only - no subject line unless specifically requested.`,
+        placeholder: 'Describe the email you want to write...',
+        generationType: 'email-content',
+      },
     },
     {
       id: 'contentType',

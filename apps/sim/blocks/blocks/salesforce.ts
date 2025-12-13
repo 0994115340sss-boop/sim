@@ -414,6 +414,50 @@ export const SalesforceBlock: BlockConfig<SalesforceResponse> = {
       type: 'long-input',
       placeholder: 'JSON array of report filters',
       condition: { field: 'operation', value: ['run_report'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Salesforce developer. Generate report filter JSON for Salesforce Analytics API.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.account_id>\`, \`<function1.result.date>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_OWNER}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of filter objects. Do not include any explanations, markdown formatting, or comments.
+
+### FILTER STRUCTURE
+Each filter object should have:
+- **column**: The API name of the field to filter
+- **operator**: Comparison operator (equals, notEqual, lessThan, greaterThan, lessOrEqual, greaterOrEqual, contains, startsWith, includes, excludes)
+- **value**: The value to compare against (string or array for includes/excludes)
+
+### EXAMPLES
+
+**Single filter**: "Filter by account name"
+→ [{"column": "ACCOUNT_NAME", "operator": "equals", "value": "Acme Corp"}]
+
+**Multiple filters**: "Filter by stage and amount"
+→ [
+  {"column": "STAGE_NAME", "operator": "equals", "value": "Closed Won"},
+  {"column": "AMOUNT", "operator": "greaterThan", "value": "10000"}
+]
+
+**With variables**: "Filter by owner from previous block"
+→ [{"column": "OWNER_ID", "operator": "equals", "value": <agent1.owner_id>}]
+
+**Date filter**: "Filter by close date"
+→ [{"column": "CLOSE_DATE", "operator": "greaterOrEqual", "value": "2024-01-01"}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the report filters you need...',
+        generationType: 'json-array',
+      },
     },
     // Dashboard fields
     {
@@ -432,6 +476,77 @@ export const SalesforceBlock: BlockConfig<SalesforceResponse> = {
       placeholder: 'SELECT Id, Name FROM Account LIMIT 10',
       condition: { field: 'operation', value: ['query'] },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Salesforce developer. Generate SOQL (Salesforce Object Query Language) queries based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.account_id>\`, \`<function1.result.name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_OWNER}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY the SOQL query. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw SOQL query string.
+
+### SOQL SYNTAX GUIDE
+
+**Basic SELECT**:
+SELECT field1, field2 FROM Object WHERE condition
+
+**Common Standard Objects**:
+- Account, Contact, Lead, Opportunity, Case, Task
+- User, Campaign, Product2, Pricebook2
+
+**Operators**:
+- **=**, **!=**, **<**, **<=**, **>**, **>=** : Comparisons
+- **LIKE** : Pattern matching (\`Name LIKE '%Corp%'\`)
+- **IN** : In list (\`Status IN ('Open', 'Closed')\`)
+- **NOT IN** : Not in list
+- **AND**, **OR**, **NOT** : Logical operators
+- **INCLUDES**, **EXCLUDES** : For multi-select picklists
+
+**Date Functions**:
+- TODAY, YESTERDAY, TOMORROW
+- LAST_N_DAYS:n, NEXT_N_DAYS:n
+- THIS_WEEK, LAST_WEEK, NEXT_WEEK
+- THIS_MONTH, LAST_MONTH, NEXT_MONTH
+- THIS_QUARTER, LAST_QUARTER, NEXT_QUARTER
+- THIS_YEAR, LAST_YEAR, NEXT_YEAR
+
+**Aggregate Functions**:
+- COUNT(), COUNT(fieldName), COUNT_DISTINCT(fieldName)
+- SUM(fieldName), AVG(fieldName)
+- MIN(fieldName), MAX(fieldName)
+
+**Clauses**:
+- WHERE, ORDER BY, GROUP BY, HAVING, LIMIT, OFFSET
+
+### EXAMPLES
+
+**Simple query**: "Get all accounts"
+→ SELECT Id, Name, Industry FROM Account LIMIT 100
+
+**With filter**: "Find contacts from Acme Corp"
+→ SELECT Id, FirstName, LastName, Email FROM Contact WHERE Account.Name = 'Acme Corp'
+
+**Date filter**: "Find opportunities created this month"
+→ SELECT Id, Name, Amount, StageName FROM Opportunity WHERE CreatedDate = THIS_MONTH
+
+**Complex query**: "Find top 10 open deals over $50k"
+→ SELECT Id, Name, Amount, Account.Name, Owner.Name FROM Opportunity WHERE Amount > 50000 AND IsClosed = false ORDER BY Amount DESC LIMIT 10
+
+**With variables**: "Find contacts for a specific account"
+→ SELECT Id, FirstName, LastName FROM Contact WHERE AccountId = '<agent1.account_id>'
+
+### REMEMBER
+Return ONLY the SOQL query - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to query...',
+        generationType: 'sql-query',
+      },
     },
     {
       id: 'nextRecordsUrl',

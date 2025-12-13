@@ -314,6 +314,56 @@ export const VideoGeneratorBlock: BlockConfig<VideoBlockResponse> = {
       condition: { field: 'provider', value: 'luma' },
       placeholder: 'JSON: [{ "key": "pan_right" }, { "key": "zoom_in" }]',
       required: false,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at Luma AI video generation. Generate camera control JSON for Luma Dream Machine.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of camera control objects. Do not include any explanations, markdown formatting, or comments.
+
+### AVAILABLE CAMERA CONTROLS
+- **pan_left**: Pan camera to the left
+- **pan_right**: Pan camera to the right
+- **pan_up**: Pan camera upward
+- **pan_down**: Pan camera downward
+- **zoom_in**: Zoom camera in
+- **zoom_out**: Zoom camera out
+- **orbit_left**: Orbit camera left around subject
+- **orbit_right**: Orbit camera right around subject
+- **crane_up**: Crane shot moving up
+- **crane_down**: Crane shot moving down
+
+### FORMAT
+Each control object needs a "key" property with the control name:
+[{"key": "control_name"}, {"key": "another_control"}]
+
+### EXAMPLES
+
+**Simple pan**: "Pan to the right"
+→ [{"key": "pan_right"}]
+
+**Zoom effect**: "Zoom in dramatically"
+→ [{"key": "zoom_in"}]
+
+**Combined motion**: "Pan right while zooming in"
+→ [{"key": "pan_right"}, {"key": "zoom_in"}]
+
+**Orbit shot**: "Circle around the subject"
+→ [{"key": "orbit_right"}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the camera movement you want...',
+        generationType: 'json-array',
+      },
     },
 
     // MiniMax-specific: Prompt optimizer

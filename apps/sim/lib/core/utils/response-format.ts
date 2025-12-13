@@ -1,4 +1,5 @@
 import { createLogger } from '@/lib/logs/console/logger'
+import type { BlockConfig } from '@/blocks/types'
 
 const logger = createLogger('ResponseFormatUtils')
 
@@ -7,6 +8,117 @@ export interface Field {
   name: string
   type: string
   description?: string
+}
+
+/**
+ * Evaluates a subblock condition against current subblock values.
+ * Used to determine if a schema subblock is active based on other field values (e.g., operation type).
+ * @param condition - The condition configuration from SubBlockConfig
+ * @param subBlockValues - Current values of all subblocks
+ * @returns True if the condition is met or if there is no condition
+ */
+function evaluateSubBlockCondition(
+  condition:
+    | {
+        field: string
+        value: string | number | boolean | Array<string | number | boolean>
+        not?: boolean
+        and?: {
+          field: string
+          value: string | number | boolean | Array<string | number | boolean> | undefined
+          not?: boolean
+        }
+      }
+    | undefined,
+  subBlockValues: Record<string, any>
+): boolean {
+  if (!condition) return true
+
+  const fieldValue = subBlockValues[condition.field]?.value
+
+  let match: boolean
+  if (Array.isArray(condition.value)) {
+    match = condition.value.includes(fieldValue)
+  } else {
+    match = fieldValue === condition.value
+  }
+
+  if (condition.not) {
+    match = !match
+  }
+
+  if (condition.and) {
+    const andFieldValue = subBlockValues[condition.and.field]?.value
+    let andMatch: boolean
+    const andCondValue = condition.and.value
+
+    if (andCondValue === undefined) {
+      andMatch = andFieldValue !== undefined && andFieldValue !== null && andFieldValue !== ''
+    } else if (Array.isArray(andCondValue)) {
+      andMatch = andCondValue.includes(andFieldValue)
+    } else {
+      andMatch = andFieldValue === andCondValue
+    }
+
+    if (condition.and.not) {
+      andMatch = !andMatch
+    }
+
+    match = match && andMatch
+  }
+
+  return match
+}
+
+/**
+ * Finds the active output schema subblock for a block.
+ * Looks for subblocks with generationType 'json-schema' (in wandConfig) that have their conditions met.
+ * This generalizes schema detection to work with any block that has a schema subblock
+ * (e.g., Agent's responseFormat, Stagehand's schema/outputSchema).
+ * @param blockConfig - The block configuration
+ * @param subBlockValues - Current values of all subblocks (format: { subBlockId: { value: any } })
+ * @returns The subblock ID and parsed schema value, or null if no active schema is found
+ */
+export function findActiveOutputSchema(
+  blockConfig: BlockConfig | null | undefined,
+  subBlockValues: Record<string, any>
+): { subBlockId: string; schema: any } | null {
+  if (!blockConfig?.subBlocks) return null
+
+  // Known schema subblock IDs that define output structure
+  // These are subblocks whose value defines what the block outputs
+  const schemaSubBlockIds = ['responseFormat', 'schema', 'outputSchema']
+
+  for (const subBlock of blockConfig.subBlocks) {
+    // Check if this is a known schema subblock
+    if (!schemaSubBlockIds.includes(subBlock.id)) continue
+
+    // Check if it has json-schema generation type (either in wandConfig or directly)
+    const hasJsonSchemaType =
+      subBlock.wandConfig?.generationType === 'json-schema' ||
+      subBlock.generationType === 'json-schema'
+
+    if (!hasJsonSchemaType) continue
+
+    // Evaluate the condition to see if this subblock is active
+    const condition =
+      typeof subBlock.condition === 'function' ? subBlock.condition() : subBlock.condition
+    if (!evaluateSubBlockCondition(condition, subBlockValues)) {
+      continue
+    }
+
+    // Get the value for this subblock
+    const schemaValue = subBlockValues[subBlock.id]?.value
+    if (!schemaValue) continue
+
+    // Parse the schema value
+    const parsedSchema = parseResponseFormatSafely(schemaValue, subBlock.id)
+    if (parsedSchema) {
+      return { subBlockId: subBlock.id, schema: parsedSchema }
+    }
+  }
+
+  return null
 }
 
 /**

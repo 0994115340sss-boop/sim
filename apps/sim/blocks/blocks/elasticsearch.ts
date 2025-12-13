@@ -174,6 +174,45 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       placeholder: '{ "field": "value", "another_field": 123 }',
       required: true,
       condition: { field: 'operation', value: 'elasticsearch_index_document' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch document JSON based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the document as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### DOCUMENT GUIDELINES
+1. **Structure**: Use proper JSON object structure with field-value pairs
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, arrays, nested objects)
+3. **Naming**: Use lowercase field names with underscores (snake_case) following Elasticsearch conventions
+
+### EXAMPLES
+
+**Simple document**: "Create a user document with name, email, and age"
+→ {"name": "John Doe", "email": "john@example.com", "age": 30}
+
+**With variables**: "Create a document from previous block"
+→ {"name": <agent1.name>, "email": <agent1.email>, "source": "{{DATA_SOURCE}}"}
+
+**With nested data**: "Create a product with name, price, and category details"
+→ {"name": "Laptop", "price": 999.99, "category": {"name": "Electronics", "id": "cat-123"}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the document you want to create...',
+        generationType: 'json-object',
+      },
     },
 
     // Document body - for update (partial)
@@ -184,6 +223,43 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       placeholder: '{ "field_to_update": "new_value" }',
       required: true,
       condition: { field: 'operation', value: 'elasticsearch_update_document' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate a partial document JSON for updating an existing document.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.new_status>\`, \`<function1.result.price>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the partial document as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object with only the fields you want to update.
+
+### UPDATE GUIDELINES
+1. **Partial Updates**: Only include fields that need to be updated
+2. **Nested Updates**: Use dot notation for nested fields or include the full nested object
+3. **Arrays**: Replace entire arrays, or use scripts for array manipulation
+4. **Data Types**: Maintain consistent data types with existing document
+
+### EXAMPLES
+
+**Simple update**: "Update the email and status fields"
+→ {"email": "newemail@example.com", "status": "active"}
+
+**With variables**: "Update fields from previous block"
+→ {"status": <agent1.new_status>, "updated_by": "{{SYSTEM_USER}}"}
+
+### REMEMBER
+Return ONLY valid JSON with fields to update - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what fields you want to update...',
+        generationType: 'json-object',
+      },
     },
 
     // Search query
@@ -193,6 +269,72 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       type: 'code',
       placeholder: '{ "match": { "field": "search term" } }',
       condition: { field: 'operation', value: 'elasticsearch_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch Query DSL queries based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.search_term>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the query as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON query object.
+
+### QUERY GUIDELINES
+1. **Query DSL**: Use Elasticsearch Query DSL syntax
+2. **Performance**: Structure queries efficiently
+3. **Relevance**: Use appropriate query types for the use case
+4. **Combining**: Use bool queries to combine multiple conditions
+
+### COMMON QUERY TYPES
+
+**Match Query** (full-text search):
+{"match": {"field": "search text"}}
+
+**Term Query** (exact match):
+{"term": {"status": "active"}}
+
+**Range Query**:
+{"range": {"age": {"gte": 18, "lte": 65}}}
+
+**Bool Query** (combine queries):
+{"bool": {"must": [{"match": {"title": "elasticsearch"}}], "filter": [{"term": {"status": "published"}}]}}
+
+**Multi-Match** (search multiple fields):
+{"multi_match": {"query": "search text", "fields": ["title", "content"]}}
+
+**Match Phrase** (exact phrase):
+{"match_phrase": {"description": "exact phrase here"}}
+
+### EXAMPLES
+
+**Simple search**: "Find documents with 'elasticsearch' in the title"
+→ {"match": {"title": "elasticsearch"}}
+
+**Multiple conditions**: "Find active users over 18"
+→ {"bool": {"must": [{"term": {"status": "active"}}, {"range": {"age": {"gt": 18}}}]}}
+
+**Text search with filters**: "Search for 'laptop' in products that are in stock and priced under 1000"
+→ {"bool": {"must": [{"match": {"name": "laptop"}}], "filter": [{"term": {"in_stock": true}}, {"range": {"price": {"lt": 1000}}]}]}}
+
+**Complex bool query**: "Find published articles about 'python' or 'javascript' written in 2024"
+→ {"bool": {"must": [{"term": {"status": "published"}}, {"range": {"published_date": {"gte": "2024-01-01", "lte": "2024-12-31"}}], "should": [{"match": {"tags": "python"}}, {"match": {"tags": "javascript"}}], "minimum_should_match": 1}}
+
+**Fuzzy search**: "Find documents similar to 'elastiksearch'"
+→ {"fuzzy": {"title": {"value": "elastiksearch", "fuzziness": "AUTO"}}}
+
+### REMEMBER
+Return ONLY valid JSON query - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what you want to search for...',
+        generationType: 'elasticsearch-query',
+      },
     },
 
     // Count query
@@ -202,6 +344,45 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       type: 'code',
       placeholder: '{ "match": { "field": "value" } }',
       condition: { field: 'operation', value: 'elasticsearch_count' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch Query DSL queries for counting documents.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY the query as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON query object.
+
+### COUNT QUERY GUIDELINES
+1. **Query DSL**: Use Elasticsearch Query DSL syntax (same as search queries)
+2. **Efficiency**: Use filters instead of queries when possible for better performance
+3. **Structure**: Same query structure as search queries
+
+### EXAMPLES
+
+**Count by term**: "Count active documents"
+→ {"term": {"status": "active"}}
+
+**Count with range**: "Count users between 18 and 65"
+→ {"range": {"age": {"gte": 18, "lte": 65}}}
+
+**Count with multiple conditions**: "Count published articles from 2024"
+→ {"bool": {"must": [{"term": {"status": "published"}}, {"range": {"published_date": {"gte": "2024-01-01", "lte": "2024-12-31"}}}]}}
+
+**Count matching text**: "Count documents containing 'error'"
+→ {"match": {"message": "error"}}
+
+### REMEMBER
+Return ONLY valid JSON query - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what documents you want to count...',
+        generationType: 'elasticsearch-query',
+      },
     },
 
     // Search size
@@ -229,6 +410,45 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       type: 'code',
       placeholder: '[{ "field": { "order": "asc" } }]',
       condition: { field: 'operation', value: 'elasticsearch_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch sort specifications as JSON arrays.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY the sort specification as a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### SORT GUIDELINES
+1. **Array Format**: Always return a JSON array, even for single field sorts
+2. **Order**: Use "asc" for ascending, "desc" for descending
+3. **Multiple Fields**: Array order determines sort priority
+4. **Nested Fields**: Use dot notation for nested fields
+
+### EXAMPLES
+
+**Single field ascending**: "Sort by name"
+→ [{"name": {"order": "asc"}}]
+
+**Single field descending**: "Sort by date newest first"
+→ [{"created_at": {"order": "desc"}}]
+
+**Multiple fields**: "Sort by category then price"
+→ [{"category": {"order": "asc"}}, {"price": {"order": "asc"}}]
+
+**Complex sort**: "Sort by status, then by date descending, then by score"
+→ [{"status": {"order": "asc"}}, {"date": {"order": "desc"}}, {"score": {"order": "desc"}}]
+
+**Nested field**: "Sort by customer name"
+→ [{"customer.name": {"order": "asc"}}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe how you want to sort the results...',
+        generationType: 'elasticsearch-sort',
+      },
     },
 
     // Source includes
@@ -264,6 +484,72 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
         '{ "index": { "_index": "my-index", "_id": "1" } }\n{ "field": "value" }\n{ "delete": { "_index": "my-index", "_id": "2" } }',
       required: true,
       condition: { field: 'operation', value: 'elasticsearch_bulk' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch bulk operations in NDJSON (Newline Delimited JSON) format.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY the bulk operations as NDJSON (each JSON object on a new line). Do not include any explanations, markdown formatting, comments, or additional text. Just the raw NDJSON.
+
+### BULK OPERATION FORMAT
+Bulk operations use NDJSON format where:
+- Each operation action is on one line (index, create, update, delete)
+- Each document follows on the next line (for index/create/update)
+- Each pair is separated by a newline
+
+### OPERATION TYPES
+
+**Index** (create or replace):
+{"index": {"_index": "my-index", "_id": "1"}}
+{"field": "value", "another": 123}
+
+**Create** (only if doesn't exist):
+{"create": {"_index": "my-index", "_id": "2"}}
+{"field": "value"}
+
+**Update** (partial update):
+{"update": {"_index": "my-index", "_id": "3"}}
+{"doc": {"field": "new_value"}}
+
+**Delete**:
+{"delete": {"_index": "my-index", "_id": "4"}}
+
+### EXAMPLES
+
+**Index multiple documents**: "Index two user documents"
+→ {"index": {"_index": "users", "_id": "1"}}
+{"name": "John", "email": "john@example.com"}
+{"index": {"_index": "users", "_id": "2"}}
+{"name": "Jane", "email": "jane@example.com"}
+
+**Mixed operations**: "Index one document and delete another"
+→ {"index": {"_index": "products", "_id": "new-1"}}
+{"name": "Widget", "price": 19.99}
+{"delete": {"_index": "products", "_id": "old-1"}}
+
+**Update operations**: "Update two documents"
+→ {"update": {"_index": "users", "_id": "1"}}
+{"doc": {"status": "active"}}
+{"update": {"_index": "users", "_id": "2"}}
+{"doc": {"status": "inactive"}}
+
+**Bulk create**: "Create three products"
+→ {"create": {"_index": "products"}}
+{"name": "Product A", "price": 10}
+{"create": {"_index": "products"}}
+{"name": "Product B", "price": 20}
+{"create": {"_index": "products"}}
+{"name": "Product C", "price": 30}
+
+### REMEMBER
+Return ONLY NDJSON format (each JSON object on its own line) - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the bulk operations you want to perform...',
+        generationType: 'elasticsearch-bulk',
+      },
     },
 
     // Index settings
@@ -273,6 +559,50 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       type: 'code',
       placeholder: '{ "number_of_shards": 1, "number_of_replicas": 1 }',
       condition: { field: 'operation', value: 'elasticsearch_create_index' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch index settings as JSON.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY the settings as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### SETTINGS GUIDELINES
+1. **Shards**: number_of_shards determines how data is split (typically 1-5 for small indices)
+2. **Replicas**: number_of_replicas for redundancy (0 for development, 1+ for production)
+3. **Analysis**: Custom analyzers, tokenizers, filters
+4. **Refresh**: Control when changes become searchable
+
+### COMMON SETTINGS
+
+**Basic settings**:
+{"number_of_shards": 1, "number_of_replicas": 1}
+
+**With refresh interval**:
+{"number_of_shards": 1, "number_of_replicas": 1, "refresh_interval": "30s"}
+
+**With analysis**:
+{"number_of_shards": 1, "number_of_replicas": 1, "analysis": {"analyzer": {"custom": {"type": "standard"}}}}
+
+### EXAMPLES
+
+**Simple settings**: "Create index with 1 shard and 1 replica"
+→ {"number_of_shards": 1, "number_of_replicas": 1}
+
+**Production settings**: "Create index with 3 shards, 2 replicas, and 10s refresh"
+→ {"number_of_shards": 3, "number_of_replicas": 2, "refresh_interval": "10s"}
+
+**Development settings**: "Create index with no replicas for testing"
+→ {"number_of_shards": 1, "number_of_replicas": 0}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the index settings you need...',
+        generationType: 'json-object',
+      },
     },
 
     // Index mappings
@@ -282,6 +612,65 @@ export const ElasticsearchBlock: BlockConfig<ElasticsearchResponse> = {
       type: 'code',
       placeholder: '{ "properties": { "field": { "type": "text" } } }',
       condition: { field: 'operation', value: 'elasticsearch_create_index' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Elasticsearch developer. Generate Elasticsearch index mappings as JSON.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY the mappings as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### MAPPING GUIDELINES
+1. **Properties**: Define field types and behaviors
+2. **Field Types**: text (full-text), keyword (exact), long/integer (numbers), date, boolean, object, nested
+3. **Analysis**: text fields are analyzed, keyword fields are not
+4. **Nested**: Use nested type for arrays of objects that need independent querying
+
+### COMMON FIELD TYPES
+
+**Text** (full-text search):
+{"properties": {"title": {"type": "text"}}}
+
+**Keyword** (exact match, sorting):
+{"properties": {"status": {"type": "keyword"}}}
+
+**Number**:
+{"properties": {"age": {"type": "integer"}, "price": {"type": "float"}}}
+
+**Date**:
+{"properties": {"created_at": {"type": "date"}}}
+
+**Boolean**:
+{"properties": {"active": {"type": "boolean"}}}
+
+**Object** (nested structure):
+{"properties": {"user": {"type": "object", "properties": {"name": {"type": "text"}, "email": {"type": "keyword"}}}}}
+
+**Nested** (array of objects):
+{"properties": {"tags": {"type": "nested", "properties": {"name": {"type": "keyword"}, "value": {"type": "text"}}}}}
+
+### EXAMPLES
+
+**Simple mapping**: "Create mapping for user with name, email, and age"
+→ {"properties": {"name": {"type": "text"}, "email": {"type": "keyword"}, "age": {"type": "integer"}}}
+
+**Product mapping**: "Create mapping for product with name, price, description, and tags"
+→ {"properties": {"name": {"type": "text"}, "price": {"type": "float"}, "description": {"type": "text"}, "tags": {"type": "keyword"}}}
+
+**Complex nested**: "Create mapping for order with customer and items"
+→ {"properties": {"order_id": {"type": "keyword"}, "customer": {"type": "object", "properties": {"name": {"type": "text"}, "email": {"type": "keyword"}}}, "items": {"type": "nested", "properties": {"product": {"type": "text"}, "quantity": {"type": "integer"}, "price": {"type": "float"}}}, "created_at": {"type": "date"}}}
+
+**With analyzers**: "Create text field with custom analyzer"
+→ {"properties": {"content": {"type": "text", "analyzer": "standard"}}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the index mapping you need...',
+        generationType: 'elasticsearch-mapping',
+      },
     },
 
     // Refresh option

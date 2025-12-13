@@ -123,6 +123,74 @@ export const TrelloBlock: BlockConfig<ToolResponse> = {
         field: 'operation',
         value: 'trello_create_card',
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Trello card descriptions. Create clear, organized card content.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.task>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{TEAM_NAME}}\`)
+
+### TRELLO MARKDOWN
+Trello supports markdown:
+- **bold** with double asterisks
+- *italic* with asterisks
+- ~~strikethrough~~ with tildes
+- \`code\` with backticks
+- [link text](url)
+- - bullet lists
+- 1. numbered lists
+
+### GUIDELINES
+1. **Structure**: Use headers and lists
+2. **Checklist Items**: Define clear action items
+3. **Context**: Include background information
+4. **Links**: Reference related resources
+5. **Brevity**: Keep it scannable
+
+### EXAMPLES
+
+**Feature card**: "Write description for new dashboard feature"
+→ ## Overview
+Implement new analytics dashboard with real-time metrics.
+
+## Requirements
+- Display key performance metrics
+- Support date range filtering
+- Auto-refresh every 30 seconds
+
+## Acceptance Criteria
+- [ ] Dashboard loads within 2 seconds
+- [ ] All metrics update in real-time
+- [ ] Mobile responsive design
+
+## Resources
+- [Design mockups](link)
+- [API documentation](link)
+
+**With variables**: "Create card from request"
+→ ## Request
+From: <agent1.requester>
+Priority: <function1.priority>
+
+## Details
+<agent1.description>
+
+## Action Items
+- [ ] Review requirements
+- [ ] Estimate effort
+- [ ] Assign to team member
+
+### REMEMBER
+Use markdown for structure. Include actionable checklist items.`,
+        placeholder: 'Describe the card content...',
+        generationType: 'markdown-content',
+      },
     },
 
     {

@@ -87,6 +87,52 @@ export const AirtableBlock: BlockConfig<AirtableResponse> = {
       placeholder: 'For Create: `[{ "fields": { ... } }]`\n',
       condition: { field: 'operation', value: ['create', 'updateMultiple'] },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Airtable API developer. Generate Airtable records JSON array for create or bulk update operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of record objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### RECORD STRUCTURE
+For creating records:
+- Each record has a **fields** object containing field name/value pairs
+- Field names must match exactly with your Airtable base
+
+For updating multiple records:
+- Each record needs an **id** field with the record ID
+- Plus a **fields** object with fields to update
+
+### EXAMPLES
+
+**Create single record**: "Add a new contact John Doe with email"
+→ [{"fields": {"Name": "John Doe", "Email": "john@example.com"}}]
+
+**With variables**: "Create record from previous block data"
+→ [{"fields": {"Name": <agent1.name>, "Email": <agent1.email>, "Status": "{{DEFAULT_STATUS}}"}}]
+
+**Bulk update**: "Update status for two records"
+→ [
+  {"id": "recABC123", "fields": {"Status": "Complete"}},
+  {"id": "recDEF456", "fields": {"Status": "In Progress"}}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the records you want to create or update...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'fields',
@@ -95,6 +141,49 @@ export const AirtableBlock: BlockConfig<AirtableResponse> = {
       placeholder: 'Fields to update: `{ "Field Name": "New Value" }`',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Airtable API developer. Generate Airtable fields JSON object for updating a single record.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.new_status>\`, \`<function1.result.price>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_CATEGORY}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON object with field name/value pairs. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### FIELD VALUES
+- **Text fields**: String values
+- **Number fields**: Numeric values
+- **Checkbox**: true or false
+- **Single select**: String matching option name
+- **Multi-select**: Array of option names
+- **Linked records**: Array of record IDs
+- **Date**: ISO date string
+
+### EXAMPLES
+
+**Update text fields**: "Update name and email"
+→ {"Name": "Jane Doe", "Email": "jane@example.com"}
+
+**With variables**: "Update fields from previous block"
+→ {"Status": <agent1.new_status>, "Updated By": "{{SYSTEM_USER}}"}
+
+**Update status**: "Mark as completed"
+→ {"Status": "Completed", "Completed Date": "2024-01-15"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the fields you want to update...',
+        generationType: 'json-object',
+      },
     },
     ...getTrigger('airtable_webhook').subBlocks,
   ],

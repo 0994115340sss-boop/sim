@@ -50,6 +50,49 @@ export const QdrantBlock: BlockConfig<QdrantResponse> = {
       placeholder: '[{"id": 1, "vector": [0.1, 0.2], "payload": {"category": "a"}}]',
       condition: { field: 'operation', value: 'upsert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Qdrant vector database developer. Generate Qdrant points JSON array for upsert operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<embedding1.vector>\`, \`<agent1.document_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COLLECTION_PREFIX}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of point objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### POINT STRUCTURE
+Each point must have:
+- **id**: Unique identifier (string UUID or integer)
+- **vector**: Array of floats representing the embedding
+- **payload**: Optional object with metadata
+
+### EXAMPLES
+
+**Single point**: "Add a document about AI"
+→ [{"id": 1, "vector": [0.1, 0.2, 0.3], "payload": {"category": "technology", "topic": "AI"}}]
+
+**With variables**: "Add point with embedding from previous block"
+→ [{"id": <agent1.doc_id>, "vector": <embedding1.vector>, "payload": {"content": <agent1.content>}}]
+
+**Multiple points**: "Add two product vectors"
+→ [
+  {"id": "prod-1", "vector": [0.1, 0.2, 0.3], "payload": {"name": "Widget", "price": 29.99}},
+  {"id": "prod-2", "vector": [0.4, 0.5, 0.6], "payload": {"name": "Gadget", "price": 49.99}}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the points you want to upsert...',
+        generationType: 'json-array',
+      },
     },
     // Search fields
     {
@@ -89,6 +132,51 @@ export const QdrantBlock: BlockConfig<QdrantResponse> = {
       type: 'long-input',
       placeholder: '{"must":[{"key":"city","match":{"value":"London"}}]}',
       condition: { field: 'operation', value: 'search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Qdrant vector database developer. Generate Qdrant filter JSON for search operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.category>\`, \`<function1.result.city>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_REGION}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON filter. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### QDRANT FILTER SYNTAX
+Qdrant filters use clauses:
+- **must**: All conditions must match (AND)
+- **should**: At least one condition must match (OR)
+- **must_not**: None of the conditions should match (NOT)
+
+Each condition has:
+- **key**: Field name in payload
+- **match**: Match condition (value, text, any, except)
+- **range**: Range condition (gt, gte, lt, lte)
+
+### EXAMPLES
+
+**Simple match**: "Filter by city London"
+→ {"must": [{"key": "city", "match": {"value": "London"}}]}
+
+**With variables**: "Filter by user's selected category"
+→ {"must": [{"key": "category", "match": {"value": <agent1.selected_category>}}]}
+
+**Range filter**: "Filter products with price between 10 and 100"
+→ {"must": [{"key": "price", "range": {"gte": 10, "lte": 100}}]}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the filter conditions...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'search_return_data',

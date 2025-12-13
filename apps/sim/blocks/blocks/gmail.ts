@@ -76,6 +76,52 @@ export const GmailBlock: BlockConfig<GmailToolResponse> = {
       placeholder: 'Email content',
       condition: { field: 'operation', value: ['send_gmail', 'draft_gmail'] },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert email writer. Compose professional, clear, and effective email content.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.customer_name>\`, \`<function1.result.order_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COMPANY_NAME}}\`, \`{{SUPPORT_EMAIL}}\`)
+
+### GUIDELINES
+1. **Tone**: Match the appropriate tone (formal, friendly, urgent) based on context
+2. **Structure**: Use clear paragraphs, bullet points where helpful
+3. **Brevity**: Be concise but complete
+4. **Call to Action**: Include clear next steps when appropriate
+5. **Personalization**: Use variable references for dynamic content
+
+### EXAMPLES
+
+**Professional inquiry**: "Ask about project status"
+→ Hi [Name],
+
+I hope this email finds you well. I wanted to follow up on the project we discussed last week.
+
+Could you provide an update on the current status and expected timeline? Please let me know if there are any blockers I can help address.
+
+Best regards
+
+**With variables**: "Send order confirmation"
+→ Dear <agent1.customer_name>,
+
+Thank you for your order #<function1.order_id>!
+
+Your order has been confirmed and will be shipped within 2-3 business days.
+
+Best,
+{{COMPANY_NAME}}
+
+### REMEMBER
+Write the email body only - no subject line unless specifically requested.`,
+        placeholder: 'Describe the email you want to write...',
+        generationType: 'email-content',
+      },
     },
     {
       id: 'contentType',

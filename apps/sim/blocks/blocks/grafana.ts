@@ -154,6 +154,58 @@ export const GrafanaBlock: BlockConfig<GrafanaResponse> = {
         field: 'operation',
         value: ['grafana_create_dashboard', 'grafana_update_dashboard'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Grafana developer. Generate Grafana panel configuration JSON array.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.metric_name>\`, \`<function1.result.query>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DATASOURCE_UID}}\`, \`{{DASHBOARD_TITLE}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of panel objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### PANEL STRUCTURE
+Each panel typically has:
+- **id**: Unique panel ID (number)
+- **type**: Panel type (graph, stat, gauge, table, text, etc.)
+- **title**: Panel title
+- **gridPos**: Position {x, y, w, h}
+- **targets**: Array of data source queries
+- **options**: Panel-specific options
+
+### EXAMPLES
+
+**Simple stat panel**: "Create a panel showing total users"
+→ [{
+  "id": 1,
+  "type": "stat",
+  "title": "Total Users",
+  "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+  "targets": [{"refId": "A", "expr": "sum(users_total)"}]
+}]
+
+**With variables**: "Create panel with dynamic title and query"
+→ [{
+  "id": 1,
+  "type": "timeseries",
+  "title": <agent1.panel_title>,
+  "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+  "targets": [{"refId": "A", "expr": <agent1.prometheus_query>}]
+}]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the panels you want to create...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'message',
@@ -226,6 +278,60 @@ export const GrafanaBlock: BlockConfig<GrafanaResponse> = {
       condition: {
         field: 'operation',
         value: ['grafana_create_alert_rule', 'grafana_update_alert_rule'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Grafana developer. Generate Grafana alert rule query data JSON array.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.query>\`, \`<function1.result.threshold>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{PROMETHEUS_UID}}\`, \`{{ALERT_THRESHOLD}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of query/expression data objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### QUERY DATA STRUCTURE
+Each query/expression object has:
+- **refId**: Reference ID (A, B, C, etc.)
+- **queryType**: Type of query
+- **relativeTimeRange**: Time range {from, to} in seconds
+- **datasourceUid**: Data source UID
+- **model**: Query model specific to the data source
+
+### EXAMPLES
+
+**Prometheus query**: "Alert when CPU is above 80%"
+→ [
+  {
+    "refId": "A",
+    "queryType": "instant",
+    "relativeTimeRange": {"from": 600, "to": 0},
+    "datasourceUid": "prometheus",
+    "model": {"expr": "avg(cpu_usage_percent) > 80", "intervalMs": 1000}
+  }
+]
+
+**With variables**: "Alert with dynamic threshold"
+→ [
+  {
+    "refId": "A",
+    "relativeTimeRange": {"from": 600, "to": 0},
+    "datasourceUid": "{{PROMETHEUS_UID}}",
+    "model": {"expr": <agent1.prometheus_query>, "intervalMs": 1000}
+  }
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the alert query data...',
+        generationType: 'json-array',
       },
     },
     {

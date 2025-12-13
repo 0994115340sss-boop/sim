@@ -205,6 +205,43 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "John Doe",\n  "email": "john@example.com",\n  "active": true\n}',
       condition: { field: 'operation', value: 'insert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SQL developer. Generate JSON data for INSERT operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### DATA GUIDELINES
+1. **Structure**: Use field-value pairs matching your table columns
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Required Fields**: Include all required (NOT NULL) columns
+
+### EXAMPLES
+
+**Simple insert**: "Insert user with name, email, and active status"
+→ {"name": "John Doe", "email": "john@example.com", "active": true}
+
+**With variables**: "Insert user from previous block"
+→ {"name": <agent1.name>, "email": <agent1.email>, "status": "{{DEFAULT_STATUS}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to insert...',
+        generationType: 'json-object',
+      },
     },
     // Set clause for updates
     {
@@ -214,6 +251,43 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "name": "Jane Doe",\n  "email": "jane@example.com"\n}',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SQL developer. Generate JSON data for UPDATE operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.new_status>\`, \`<function1.result.price>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the update data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object with only the fields you want to update.
+
+### UPDATE DATA GUIDELINES
+1. **Partial Updates**: Only include fields that need to be updated
+2. **Data Types**: Use appropriate types (strings, numbers, booleans, null)
+3. **Naming**: Use column names exactly as they appear in your table
+4. **Null Values**: Use null to set fields to NULL
+
+### EXAMPLES
+
+**Simple update**: "Update name and email"
+→ {"name": "Jane Doe", "email": "jane@example.com"}
+
+**With variables**: "Update fields from previous block"
+→ {"status": <agent1.new_status>, "updated_by": "{{SYSTEM_USER}}"}
+
+### REMEMBER
+Return ONLY valid JSON with fields to update - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what fields you want to update...',
+        generationType: 'json-object',
+      },
     },
     // Conditions for update/delete (parameterized for SQL injection prevention)
     {
@@ -223,6 +297,50 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "id": 1\n}',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SQL developer. Generate JSON conditions for UPDATE operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+### CRITICAL INSTRUCTION
+Return ONLY the conditions as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### ⚠️ UPDATE WARNING ⚠️
+Be specific with conditions to avoid updating unintended rows. Use unique identifiers when possible.
+
+### CONDITIONS GUIDELINES
+1. **WHERE Clause**: Conditions are used in WHERE clause (e.g., WHERE id = 1)
+2. **Equality**: Simple key-value pairs create equality conditions
+3. **Multiple Conditions**: Multiple fields create AND conditions
+4. **Unique Identifiers**: Prefer using primary keys or unique fields
+
+### EXAMPLES
+
+**By ID**: "Update where id equals 1"
+→ {"id": 1}
+
+**By email**: "Update where email equals user@example.com"
+→ {"email": "user@example.com"}
+
+**Multiple conditions**: "Update where status is active and created_date is before 2024"
+→ {"status": "active", "created_date": "2023-12-31"}
+
+**By composite key**: "Update where user_id is 123 and order_id is 456"
+→ {"user_id": 123, "order_id": 456}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the conditions for the update...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'conditions',
@@ -231,6 +349,42 @@ Return ONLY the SQL query - no explanations, no markdown, no extra text.`,
       placeholder: '{\n  "id": 1\n}',
       condition: { field: 'operation', value: 'delete' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SQL developer. Generate JSON conditions for DELETE operations.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY the conditions as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### ⚠️ DELETION WARNING ⚠️
+DELETIONS ARE PERMANENT! Be extremely careful and specific with your conditions. Use unique identifiers when possible.
+
+### CONDITIONS GUIDELINES
+1. **WHERE Clause**: Conditions are used in WHERE clause (e.g., WHERE id = 1)
+2. **Equality**: Simple key-value pairs create equality conditions
+3. **Multiple Conditions**: Multiple fields create AND conditions
+4. **Unique Identifiers**: ALWAYS prefer using primary keys or unique fields
+
+### EXAMPLES
+
+**By ID**: "Delete where id equals 1"
+→ {"id": 1}
+
+**By email**: "Delete where email equals user@example.com"
+→ {"email": "user@example.com"}
+
+**Multiple conditions**: "Delete where status is inactive and created_date is before 2023"
+→ {"status": "inactive", "created_date": "2022-12-31"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text. Be extremely careful with deletion conditions!`,
+        placeholder: 'Describe the conditions for the delete...',
+        generationType: 'json-object',
+      },
     },
   ],
   tools: {

@@ -193,6 +193,81 @@ export const JiraBlock: BlockConfig<JiraResponse> = {
       placeholder: 'Enter new description for the issue',
       dependsOn: ['projectId'],
       condition: { field: 'operation', value: ['update', 'write'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Jira issue descriptions. Create clear, well-structured descriptions.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.error>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{ENVIRONMENT}}\`)
+
+### JIRA FORMATTING
+Jira uses its own wiki-style markup:
+- *bold* or **bold**
+- _italic_
+- h1. Header 1, h2. Header 2, etc.
+- * bullet points
+- # numbered lists
+- {code}code block{code}
+- [link text|URL]
+
+### GUIDELINES
+1. **Structure**: Use headers and bullet points
+2. **Context**: Include background and impact
+3. **Acceptance Criteria**: Define completion criteria
+4. **Technical Details**: Include relevant technical info
+5. **Reproducibility**: For bugs, include steps to reproduce
+
+### EXAMPLES
+
+**Bug ticket**: "Write a bug description for API timeout"
+→ h2. Description
+API requests to the user service are timing out under high load.
+
+h2. Steps to Reproduce
+# Send 100+ concurrent requests to /api/users
+# Observe response times
+# Note timeout errors after ~30 seconds
+
+h2. Expected Behavior
+All requests should complete within 5 seconds.
+
+h2. Actual Behavior
+~20% of requests timeout with 504 errors.
+
+h2. Impact
+* Affects user registration flow
+* Estimated 500 users impacted daily
+
+h2. Technical Details
+* Endpoint: /api/users
+* Environment: Production
+* Load balancer logs attached
+
+**With variables**: "Create ticket from alert"
+→ h2. Description
+Automated ticket from monitoring alert.
+
+h2. Alert Details
+* Service: <agent1.service>
+* Error: <function1.error_message>
+* Time: <function1.timestamp>
+
+h2. Actions Required
+* Investigate root cause
+* Implement fix
+* Update monitoring
+
+### REMEMBER
+Use Jira wiki markup. Be thorough and structured.`,
+        placeholder: 'Describe the Jira issue...',
+        generationType: 'markdown-content',
+      },
     },
     // Delete Issue fields
     {
@@ -239,6 +314,77 @@ export const JiraBlock: BlockConfig<JiraResponse> = {
       required: true,
       placeholder: 'Enter JQL query (e.g., project = PROJ AND status = "In Progress")',
       condition: { field: 'operation', value: 'search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Jira administrator. Generate JQL (Jira Query Language) queries based on the user's request.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.project_key>\`, \`<function1.result.assignee>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_PROJECT}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY the JQL query. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JQL query string.
+
+### JQL SYNTAX GUIDE
+
+**Field Operators**:
+- **=** : Equals - \`status = "In Progress"\`
+- **!=** : Not equals - \`status != Done\`
+- **~** : Contains - \`summary ~ "bug"\`
+- **!~** : Does not contain - \`summary !~ "test"\`
+- **>**, **>=**, **<**, **<=** : Comparisons - \`created > -7d\`
+- **IN** : In list - \`status IN ("Open", "In Progress")\`
+- **NOT IN** : Not in list - \`priority NOT IN (Low, Lowest)\`
+- **IS** : Is empty/null - \`assignee IS EMPTY\`
+- **IS NOT** : Is not empty - \`resolution IS NOT EMPTY\`
+- **WAS** : Historical value - \`status WAS "Open"\`
+- **CHANGED** : Field changed - \`status CHANGED\`
+
+**Logical Operators**:
+- **AND** : Both conditions - \`project = PROJ AND status = Open\`
+- **OR** : Either condition - \`priority = High OR priority = Critical\`
+- **NOT** : Negate - \`NOT status = Closed\`
+
+**Common Fields**:
+- project, issuetype, status, priority, resolution
+- assignee, reporter, creator, watcher
+- created, updated, resolved, due, duedate
+- summary, description, labels, components
+- fixVersion, affectedVersion, sprint
+
+**Date Functions**:
+- \`startOfDay()\`, \`endOfDay()\`
+- \`startOfWeek()\`, \`endOfWeek()\`
+- \`startOfMonth()\`, \`endOfMonth()\`
+- Relative: \`-7d\` (7 days ago), \`-2w\` (2 weeks ago)
+
+### EXAMPLES
+
+**Simple query**: "Find all open bugs in project PROJ"
+→ project = PROJ AND issuetype = Bug AND status = Open
+
+**With assignee**: "Find my tasks in progress"
+→ assignee = currentUser() AND status = "In Progress"
+
+**Date range**: "Find issues created this week"
+→ created >= startOfWeek() AND created <= endOfWeek()
+
+**Complex query**: "Find high priority unresolved issues assigned to me or unassigned"
+→ priority IN (High, Critical) AND resolution IS EMPTY AND (assignee = currentUser() OR assignee IS EMPTY)
+
+**With variables**: "Search for issues in a specific project"
+→ project = <agent1.project_key> AND status != Done
+
+### REMEMBER
+Return ONLY the JQL query - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the issues you want to search for...',
+        generationType: 'sql-query',
+      },
     },
     {
       id: 'maxResults',

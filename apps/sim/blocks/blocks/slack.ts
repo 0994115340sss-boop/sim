@@ -124,6 +124,65 @@ export const SlackBlock: BlockConfig<SlackResponse> = {
         value: 'send',
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Slack messages. Compose clear, engaging messages using Slack's mrkdwn formatting.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_name>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{TEAM_NAME}}\`)
+
+### SLACK MRKDWN FORMATTING
+- *bold* with asterisks
+- _italic_ with underscores
+- ~strikethrough~ with tildes
+- \`code\` with backticks
+- \`\`\`code block\`\`\` with triple backticks
+- > blockquote with >
+- • bullet points with •
+- <URL|link text> for links
+- :emoji: for emojis (e.g., :white_check_mark:, :warning:, :rocket:)
+
+### GUIDELINES
+1. **Tone**: Match workplace communication style (professional but friendly)
+2. **Formatting**: Use mrkdwn for emphasis and structure
+3. **Emojis**: Use sparingly for visual interest
+4. **Mentions**: Use <@USER_ID> for mentions if needed
+5. **Brevity**: Keep messages scannable
+
+### EXAMPLES
+
+**Status update**: "Share deployment status"
+→ :rocket: *Deployment Complete*
+
+The latest release has been deployed to production.
+
+*Changes included:*
+• Performance improvements
+• Bug fixes for login flow
+• New dashboard features
+
+cc: <@engineering-team>
+
+**With variables**: "Alert about system status"
+→ :warning: *Alert: System Status Change*
+
+Service: <agent1.service_name>
+Status: <function1.status>
+Time: <function1.timestamp>
+
+Please investigate if needed.
+
+### REMEMBER
+Use Slack mrkdwn formatting. Keep messages clear and actionable.`,
+        placeholder: 'Describe the Slack message you want to send...',
+        generationType: 'message-content',
+      },
     },
     {
       id: 'threadTs',

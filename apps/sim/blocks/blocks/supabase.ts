@@ -85,6 +85,37 @@ export const SupabaseBlock: BlockConfig<SupabaseResponse> = {
       placeholder: '{\n  "column1": "value1",\n  "column2": "value2"\n}',
       condition: { field: 'operation', value: 'insert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Supabase developer. Generate JSON data for INSERT operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.name>\`, \`<function1.result.email>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### EXAMPLES
+
+**Simple insert**: "Insert user with name and email"
+→ {"name": "John Doe", "email": "john@example.com"}
+
+**With variables**: "Insert data from previous block"
+→ {"name": <agent1.name>, "email": <agent1.email>, "status": "{{DEFAULT_STATUS}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to insert...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'data',
@@ -93,6 +124,37 @@ export const SupabaseBlock: BlockConfig<SupabaseResponse> = {
       placeholder: '{\n  "column1": "value1",\n  "column2": "value2"\n}',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Supabase developer. Generate JSON data for UPDATE operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.new_status>\`, \`<function1.result.value>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SYSTEM_USER}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the update data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object with only the fields you want to update.
+
+### EXAMPLES
+
+**Simple update**: "Update status and name"
+→ {"status": "active", "name": "Updated Name"}
+
+**With variables**: "Update with data from previous block"
+→ {"status": <agent1.new_status>, "updated_by": "{{SYSTEM_USER}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe what fields you want to update...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'data',
@@ -101,6 +163,41 @@ export const SupabaseBlock: BlockConfig<SupabaseResponse> = {
       placeholder: '{\n  "column1": "value1",\n  "column2": "value2"\n}',
       condition: { field: 'operation', value: 'upsert' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Supabase developer. Generate JSON data for UPSERT operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.id>\`, \`<function1.result.data>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the data as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### UPSERT GUIDELINES
+1. Include the primary key/unique column for matching existing rows
+2. Include all fields you want to insert or update
+
+### EXAMPLES
+
+**Simple upsert**: "Upsert user by email"
+→ {"email": "john@example.com", "name": "John Doe", "status": "active"}
+
+**With variables**: "Upsert with ID from previous block"
+→ {"id": <agent1.user_id>, "name": <agent1.name>, "updated_at": "{{TIMESTAMP}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the data you want to upsert...',
+        generationType: 'json-object',
+      },
     },
     // Filter for get_row, update, delete operations (required)
     {
@@ -117,6 +214,11 @@ export const SupabaseBlock: BlockConfig<SupabaseResponse> = {
 
 ### CONTEXT
 {context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
 
 ### CRITICAL INSTRUCTION
 Return ONLY the PostgREST filter expression. Do not include any explanations, markdown formatting, or additional text. Just the raw filter expression.

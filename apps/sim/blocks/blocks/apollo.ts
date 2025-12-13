@@ -64,6 +64,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["CEO", "VP of Sales"]',
       condition: { field: 'operation', value: 'people_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of job titles for Apollo people search.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.job_title>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["CEO", "VP of Sales"]
+["Software Engineer", "Senior Developer"]
+[<agent1.target_titles>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the job titles to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'person_locations',
@@ -71,6 +95,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["San Francisco, CA", "New York, NY"]',
       condition: { field: 'operation', value: 'people_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of locations for Apollo people search. Use "City, State" or "City, Country" format.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.location>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["San Francisco, CA", "New York, NY"]
+["London, UK", "Paris, France"]
+[<agent1.target_location>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the locations to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'organization_names',
@@ -78,6 +126,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["Company A", "Company B"]',
       condition: { field: 'operation', value: 'people_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of company names for Apollo people search.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.company>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["Acme Corp", "Tech Solutions Inc"]
+["Google", "Microsoft", "Apple"]
+[<agent1.target_companies>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the companies to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'person_seniorities',
@@ -85,6 +157,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["senior", "manager", "director"]',
       condition: { field: 'operation', value: 'people_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of seniority levels for Apollo people search. Common values: "senior", "manager", "director", "vp", "c_level", "owner", "founder".
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.seniority>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["senior", "manager", "director"]
+["vp", "c_level"]
+["founder", "owner"]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the seniority levels to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'contact_stage_ids',
@@ -92,6 +188,28 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["stage_id_1", "stage_id_2"]',
       condition: { field: 'operation', value: 'contact_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo contact stage IDs for filtering contacts by their pipeline stage.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.stage_id>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of stage ID strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["stage_id_1", "stage_id_2"]
+[<agent1.selected_stage>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Enter or describe the contact stage IDs...',
+        generationType: 'json-array',
+      },
     },
 
     // People Enrich Fields
@@ -180,6 +298,29 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       placeholder: '[{"first_name": "John", "last_name": "Doe", "email": "john@example.com"}]',
       condition: { field: 'operation', value: 'people_bulk_enrich' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of people objects for Apollo bulk enrich. Each object should have first_name, last_name, and optionally email, organization_name, or domain.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.first_name>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"first_name": "John", "last_name": "Doe", "email": "john@example.com"}]
+[{"first_name": <agent1.first_name>, "last_name": <agent1.last_name>, "email": <agent1.email>}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the people you want to enrich...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'organizations',
@@ -188,6 +329,29 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       placeholder: '[{"organization_name": "Company A", "domain": "companya.com"}]',
       condition: { field: 'operation', value: 'organization_bulk_enrich' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of organization objects for Apollo bulk enrich. Each object should have organization_name and/or domain.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.company_name>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"organization_name": "Acme Corp", "domain": "acme.com"}]
+[{"organization_name": <agent1.company>, "domain": <agent1.domain>}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the organizations you want to enrich...',
+        generationType: 'json-array',
+      },
     },
 
     // Organization Search Fields
@@ -197,6 +361,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["San Francisco, CA"]',
       condition: { field: 'operation', value: 'organization_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of location strings for Apollo organization search.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.location>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of location strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["San Francisco, CA"]
+["New York, NY", "Los Angeles, CA", "Chicago, IL"]
+["United States", "Canada"]
+[<agent1.target_location>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the locations to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'organization_num_employees_ranges',
@@ -204,6 +392,40 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["1-10", "11-50", "51-200"]',
       condition: { field: 'operation', value: 'organization_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of employee count range strings for Apollo organization search.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.company_size>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of employee range strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### AVAILABLE RANGES
+Apollo uses these standard employee count ranges:
+- "1-10" (Micro)
+- "11-50" (Small)
+- "51-200" (Medium)
+- "201-500" (Mid-Market)
+- "501-1000" (Large)
+- "1001-5000" (Enterprise)
+- "5001-10000" (Large Enterprise)
+- "10001+" (Global Enterprise)
+
+### EXAMPLES
+["1-10", "11-50"]
+["51-200", "201-500", "501-1000"]
+["1001-5000", "5001-10000", "10001+"]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the company sizes to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'q_organization_keyword_tags',
@@ -211,6 +433,30 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["saas", "b2b", "enterprise"]',
       condition: { field: 'operation', value: 'organization_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of keyword/industry tag strings for Apollo organization search.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.industry>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of keyword strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["saas", "b2b", "enterprise"]
+["fintech", "healthcare", "ai"]
+["e-commerce", "retail", "marketplace"]
+[<agent1.target_industry>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the industry keywords to search for...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'q_organization_name',
@@ -287,6 +533,25 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
         '[{"first_name": "John", "last_name": "Doe", "email": "john@example.com", "title": "CEO"}]',
       condition: { field: 'operation', value: 'contact_bulk_create' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of contact objects for Apollo bulk create. Each object must have first_name and last_name, and optionally email, title, account_id, owner_id.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"first_name": "John", "last_name": "Doe", "email": "john@example.com", "title": "CEO"}]
+[{"first_name": "Jane", "last_name": "Smith", "title": "Manager", "account_id": "123"}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the contacts you want to create...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'contacts',
@@ -295,6 +560,25 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       placeholder: '[{"id": "contact_id_1", "first_name": "John", "last_name": "Doe"}]',
       condition: { field: 'operation', value: 'contact_bulk_update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of contact objects for Apollo bulk update. Each object must have id, and fields to update like first_name, last_name, email, title.
+
+### CONTEXT
+{context}
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"id": "contact_id_1", "first_name": "John", "last_name": "Doe"}]
+[{"id": "contact_id_2", "email": "newemail@example.com", "title": "Senior Manager"}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the contacts you want to update...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'run_dedupe',
@@ -356,6 +640,28 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["stage_id_1", "stage_id_2"]',
       condition: { field: 'operation', value: 'account_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo account stage IDs for filtering accounts by their pipeline stage.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.stage_id>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of stage ID strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["stage_id_1", "stage_id_2"]
+[<agent1.selected_stage>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Enter or describe the account stage IDs...',
+        generationType: 'json-array',
+      },
     },
 
     // Account Bulk Operations
@@ -367,6 +673,29 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
         '[{"name": "Company A", "website_url": "https://companya.com", "phone": "+1234567890"}]',
       condition: { field: 'operation', value: 'account_bulk_create' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of account objects for Apollo bulk create. Each object must have name, and optionally website_url, phone, owner_id.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.company_name>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"name": "Acme Corp", "website_url": "https://acme.com", "phone": "+1234567890"}]
+[{"name": <agent1.company>, "website_url": <agent1.website>}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the accounts you want to create...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'accounts',
@@ -375,6 +704,29 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       placeholder: '[{"id": "account_id_1", "name": "Updated Company Name"}]',
       condition: { field: 'operation', value: 'account_bulk_update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of account objects for Apollo bulk update. Each object must have id, and fields to update like name, website_url, phone.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.account_id>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+[{"id": "account_id_1", "name": "Updated Company Name"}]
+[{"id": <agent1.account_id>, "name": <agent1.new_name>}]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the accounts you want to update...',
+        generationType: 'json-array',
+      },
     },
 
     // Opportunity Fields
@@ -453,6 +805,28 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["account_id_1", "account_id_2"]',
       condition: { field: 'operation', value: 'opportunity_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo account IDs for filtering opportunities.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.account_id>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of account ID strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["account_id_1", "account_id_2"]
+[<agent1.account_id>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Enter or describe the account IDs...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'stage_ids',
@@ -460,6 +834,28 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["stage_id_1", "stage_id_2"]',
       condition: { field: 'operation', value: 'opportunity_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo opportunity stage IDs for filtering opportunities.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.stage_id>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of stage ID strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["stage_id_1", "stage_id_2"]
+[<agent1.selected_stages>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Enter or describe the stage IDs...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'owner_ids',
@@ -467,6 +863,28 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       type: 'code',
       placeholder: '["user_id_1", "user_id_2"]',
       condition: { field: 'operation', value: 'opportunity_search' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo user/owner IDs for filtering opportunities by owner.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.owner_id>\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of user ID strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["user_id_1", "user_id_2"]
+[<agent1.assigned_owner>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Enter or describe the owner IDs...',
+        generationType: 'json-array',
+      },
     },
 
     // Sequence Search Fields
@@ -500,6 +918,29 @@ export const ApolloBlock: BlockConfig<ApolloResponse> = {
       placeholder: '["contact_id_1", "contact_id_2"]',
       condition: { field: 'operation', value: 'sequence_add' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `Generate a JSON array of Apollo contact IDs to add to a sequence.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax (e.g., \`<agent1.contact_id>\`).
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### EXAMPLES
+["contact_id_1", "contact_id_2"]
+[<agent1.contact_ids>]
+
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the contact IDs to add...',
+        generationType: 'json-array',
+      },
     },
 
     // Task Fields

@@ -551,9 +551,46 @@ export const GitHubBlock: BlockConfig<GitHubResponse> = {
     {
       id: 'required_status_checks',
       title: 'Required Status Checks',
-      type: 'short-input',
+      type: 'long-input',
       placeholder: 'JSON: {"strict":true,"contexts":["ci/test"]}',
       condition: { field: 'operation', value: 'github_update_branch_protection' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert GitHub developer. Generate required status checks JSON for branch protection.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### STATUS CHECKS STRUCTURE
+{
+  "strict": boolean,     // Require branches to be up to date before merging
+  "contexts": string[]   // Array of required status check names
+}
+
+### EXAMPLES
+
+**CI required**: "Require CI to pass"
+→ {"strict": true, "contexts": ["ci/test"]}
+
+**Multiple checks**: "Require tests and linting"
+→ {"strict": true, "contexts": ["ci/test", "ci/lint", "ci/build"]}
+
+**No strict**: "Just require checks, not up-to-date"
+→ {"strict": false, "contexts": ["ci/test"]}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the required status checks...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'enforce_admins',
@@ -568,9 +605,47 @@ export const GitHubBlock: BlockConfig<GitHubResponse> = {
     {
       id: 'required_pull_request_reviews',
       title: 'Required PR Reviews',
-      type: 'short-input',
+      type: 'long-input',
       placeholder: 'JSON: {"required_approving_review_count":1}',
       condition: { field: 'operation', value: 'github_update_branch_protection' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert GitHub developer. Generate required PR reviews JSON for branch protection.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### PR REVIEWS STRUCTURE
+{
+  "required_approving_review_count": number,  // Number of approvals needed (1-6)
+  "dismiss_stale_reviews": boolean,           // Dismiss approvals when new commits pushed
+  "require_code_owner_reviews": boolean,      // Require review from code owners
+  "require_last_push_approval": boolean       // Require approval of last push
+}
+
+### EXAMPLES
+
+**Single approval**: "Require one approval"
+→ {"required_approving_review_count": 1}
+
+**Strict reviews**: "Require 2 approvals, dismiss stale"
+→ {"required_approving_review_count": 2, "dismiss_stale_reviews": true}
+
+**Code owners**: "Require code owner review"
+→ {"required_approving_review_count": 1, "require_code_owner_reviews": true, "dismiss_stale_reviews": true}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the PR review requirements...',
+        generationType: 'json-object',
+      },
     },
     // Issue operations parameters
     {
@@ -587,6 +662,91 @@ export const GitHubBlock: BlockConfig<GitHubResponse> = {
       type: 'long-input',
       placeholder: 'Enter issue description (optional)',
       condition: { field: 'operation', value: 'github_create_issue' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing GitHub issue descriptions. Create clear, well-structured issues using GitHub markdown.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.error>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{REPO_URL}}\`)
+
+### GITHUB MARKDOWN
+- **bold** with double asterisks
+- *italic* with asterisks
+- \`inline code\` with backticks
+- \`\`\`language code block\`\`\`
+- - [ ] task lists
+- > blockquotes
+- [link text](url)
+- @mentions for users
+- #123 for issue references
+
+### GUIDELINES
+1. **Problem Statement**: Clearly describe the issue
+2. **Reproduction Steps**: For bugs, include steps to reproduce
+3. **Expected vs Actual**: What should happen vs what happens
+4. **Environment**: Include relevant version/environment info
+5. **Screenshots/Logs**: Reference any attachments
+
+### EXAMPLES
+
+**Bug report**: "Create a bug report for API rate limiting"
+→ ## Description
+API requests are being rate limited incorrectly, causing valid requests to fail.
+
+## Steps to Reproduce
+1. Make 10 API requests within 1 minute
+2. Observe that requests start failing after 5 requests
+3. Check response headers for rate limit info
+
+## Expected Behavior
+Rate limit should be 100 requests per minute as documented.
+
+## Actual Behavior
+Rate limit appears to be 5 requests per minute.
+
+## Environment
+- API Version: v2.1
+- Client: Node.js SDK v3.0.0
+- Region: US-East
+
+## Logs
+\`\`\`
+Error: Rate limit exceeded (5/5)
+X-RateLimit-Remaining: 0
+\`\`\`
+
+**With variables**: "Create issue from error"
+→ ## Automated Issue Report
+
+### Error Details
+- Service: <agent1.service>
+- Error: <function1.error_message>
+- Timestamp: <function1.timestamp>
+
+### Stack Trace
+\`\`\`
+<agent1.stack_trace>
+\`\`\`
+
+### Impact
+<agent1.impact_description>
+
+### Suggested Actions
+- [ ] Investigate root cause
+- [ ] Implement fix
+- [ ] Add tests
+
+### REMEMBER
+Use GitHub markdown. Include all relevant technical details.`,
+        placeholder: 'Describe the GitHub issue...',
+        generationType: 'markdown-content',
+      },
     },
     {
       id: 'labels',
@@ -849,6 +1009,45 @@ export const GitHubBlock: BlockConfig<GitHubResponse> = {
       type: 'long-input',
       placeholder: 'JSON: {"key":"value"}',
       condition: { field: 'operation', value: 'github_trigger_workflow' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert GitHub Actions developer. Generate workflow inputs JSON for triggering a workflow dispatch.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.version>\`, \`<function1.result.tag>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEPLOY_ENV}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### WORKFLOW INPUTS GUIDELINES
+1. Keys must match the input names defined in the workflow's workflow_dispatch trigger
+2. Values can be strings, numbers, or booleans depending on input type
+3. Required inputs must be provided
+
+### EXAMPLES
+
+**Simple deploy**: "Deploy to production"
+→ {"environment": "production", "dry_run": false}
+
+**Version release**: "Release version 1.2.3"
+→ {"version": "1.2.3", "create_tag": true}
+
+**With variables**: "Deploy the version from previous block"
+→ {"version": <agent1.version>, "environment": "{{DEPLOY_ENV}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the workflow inputs...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'workflow_id',

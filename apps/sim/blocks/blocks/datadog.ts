@@ -54,6 +54,47 @@ export const DatadogBlock: BlockConfig<DatadogResponse> = {
 ]`,
       condition: { field: 'operation', value: 'datadog_submit_metrics' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Datadog developer. Generate Datadog metrics series JSON array.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.metric_value>\`, \`<function1.result.tags>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DD_SERVICE}}\`, \`{{ENVIRONMENT}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the metrics series as a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### METRICS GUIDELINES
+1. **Array Format**: Always return a JSON array, even for single metric
+2. **Metric Types**: gauge, count, rate, histogram, distribution
+3. **Points**: Array of {timestamp, value} objects (timestamp in Unix seconds)
+4. **Tags**: Array of strings in "key:value" format
+5. **Metric Names**: Use dot notation (e.g., "custom.app.response_time")
+
+### EXAMPLES
+
+**Single gauge metric**: "Submit response time metric"
+→ [{"metric": "custom.app.response_time", "type": "gauge", "points": [{"timestamp": 1704067200, "value": 0.85}], "tags": ["env:production"]}]
+
+**Multiple metrics**: "Submit CPU and memory metrics"
+→ [{"metric": "system.cpu.usage", "type": "gauge", "points": [{"timestamp": 1704067200, "value": 75.5}], "tags": ["env:production"]}, {"metric": "system.memory.used", "type": "gauge", "points": [{"timestamp": 1704067200, "value": 8192}], "tags": ["env:production"]}]
+
+**With multiple points**: "Submit metric with multiple data points"
+→ [{"metric": "custom.app.requests", "type": "count", "points": [{"timestamp": 1704067200, "value": 100}, {"timestamp": 1704067300, "value": 150}], "tags": ["env:production", "service:api"]}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the metrics you want to submit...',
+        generationType: 'json-array',
+      },
     },
 
     // ========================
@@ -198,6 +239,50 @@ export const DatadogBlock: BlockConfig<DatadogResponse> = {
       type: 'code',
       placeholder: '{"notify_no_data": true, "thresholds": {"critical": 90}}',
       condition: { field: 'operation', value: 'datadog_create_monitor' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Datadog developer. Generate Datadog monitor options JSON.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.threshold>\`, \`<function1.result.interval>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{ALERT_THRESHOLD}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the options as valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### OPTIONS GUIDELINES
+1. **Thresholds**: Define warning and critical thresholds
+2. **Notify No Data**: Whether to notify when no data is received
+3. **Evaluation Delay**: Delay before evaluation (in seconds)
+4. **Renotify Interval**: Minutes between renotifications
+5. **Timeout**: Evaluation timeout (in seconds)
+
+### EXAMPLES
+
+**Basic thresholds**: "Set critical threshold at 90"
+→ {"thresholds": {"critical": 90}}
+
+**With warning**: "Set warning at 70 and critical at 90"
+→ {"thresholds": {"warning": 70, "critical": 90}}
+
+**Full options**: "Monitor with thresholds, notify no data, and renotify every 60 minutes"
+→ {"notify_no_data": true, "thresholds": {"warning": 70, "critical": 90}, "renotify_interval": 60}
+
+**With evaluation delay**: "Monitor with 5 minute evaluation delay"
+→ {"thresholds": {"critical": 90}, "evaluation_delay": 300}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the monitor options you need...',
+        generationType: 'json-object',
+      },
     },
 
     // ========================
@@ -266,6 +351,61 @@ export const DatadogBlock: BlockConfig<DatadogResponse> = {
       placeholder: 'service:web-app status:error',
       condition: { field: 'operation', value: 'datadog_query_logs' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Datadog developer. Generate Datadog log search queries.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY the log search query string. Do not include any explanations, markdown formatting, comments, or additional text.
+
+### LOG QUERY SYNTAX
+
+**Basic Filters**:
+- service:my-service
+- status:error
+- host:my-host
+
+**Text Search**:
+- "exact phrase"
+- message:*error*
+
+**Comparisons**:
+- @duration:>1000
+- @status_code:>=400
+
+**Combining**:
+- service:api AND status:error
+- status:error OR status:warn
+- NOT service:healthcheck
+
+**Facets**:
+- @http.url:"/api/*"
+- @user.id:12345
+
+### EXAMPLES
+
+**Simple**: "Find errors in the API service"
+→ service:api status:error
+
+**With text**: "Find logs containing 'timeout'"
+→ service:api "timeout"
+
+**Complex**: "Find API errors except healthcheck"
+→ service:api status:error NOT @http.url:"/health*"
+
+### REMEMBER
+Return ONLY the query string - no explanations.`,
+        placeholder: 'Describe the logs you want to find...',
+        generationType: 'sql-query',
+      },
     },
     {
       id: 'logFrom',
@@ -308,6 +448,48 @@ export const DatadogBlock: BlockConfig<DatadogResponse> = {
 ]`,
       condition: { field: 'operation', value: 'datadog_send_logs' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Datadog developer. Generate Datadog logs JSON array.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.message>\`, \`<function1.result.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DD_SERVICE}}\`, \`{{ENVIRONMENT}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY the logs as a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### LOGS GUIDELINES
+1. **Array Format**: Always return a JSON array, even for single log
+2. **Message**: Required field with the log message
+3. **Service**: Application/service name
+4. **ddsource**: Source identifier (e.g., "custom", "nginx", "python")
+5. **ddtags**: Comma-separated tags in "key:value" format
+6. **Additional Fields**: Add any custom fields as needed
+
+### EXAMPLES
+
+**Single log**: "Send application start log"
+→ [{"message": "Application started successfully", "service": "my-app", "ddsource": "custom", "ddtags": "env:production"}]
+
+**Multiple logs**: "Send error and info logs"
+→ [{"message": "Error occurred", "service": "api", "ddsource": "custom", "ddtags": "env:production,level:error"}, {"message": "Request processed", "service": "api", "ddsource": "custom", "ddtags": "env:production,level:info"}]
+
+**With custom fields**: "Send log with user context"
+→ [{"message": "User logged in", "service": "auth", "ddsource": "custom", "ddtags": "env:production", "user_id": "123", "ip": "192.168.1.1"}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the logs you want to send...',
+        generationType: 'json-array',
+      },
     },
 
     // ========================

@@ -262,6 +262,45 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
         field: 'operation',
         value: ['create_customer', 'update_customer'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate Stripe address JSON object.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.street>\`, \`<function1.result.city>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_COUNTRY}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON address object. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### ADDRESS FIELDS
+- **line1**: Street address (required)
+- **line2**: Apartment, suite, etc. (optional)
+- **city**: City name
+- **state**: State or province
+- **postal_code**: ZIP or postal code
+- **country**: Two-letter country code (US, CA, GB, etc.)
+
+### EXAMPLES
+
+**US address**: "123 Main St, New York, NY 10001"
+→ {"line1": "123 Main St", "city": "New York", "state": "NY", "postal_code": "10001", "country": "US"}
+
+**With variables**: "Use address from previous block"
+→ {"line1": <agent1.street>, "city": <agent1.city>, "state": <agent1.state>, "postal_code": <agent1.zip>, "country": "{{DEFAULT_COUNTRY}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the address...',
+        generationType: 'json-object',
+      },
     },
     // Subscription specific fields - REQUIRED for create_subscription
     {
@@ -274,6 +313,48 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
         value: ['create_subscription'],
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate Stripe subscription items JSON array.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.price_id>\`, \`<function1.result.quantity>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_PLAN_PRICE_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of subscription item objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### ITEM STRUCTURE
+Each item must have:
+- **price**: Price ID (price_xxx) - REQUIRED
+- **quantity**: Number of units (default: 1)
+
+### EXAMPLES
+
+**Single item**: "Subscribe to monthly plan"
+→ [{"price": "price_monthly_plan", "quantity": 1}]
+
+**With variables**: "Subscribe with plan from previous block"
+→ [{"price": <agent1.selected_price_id>, "quantity": <function1.seat_count>}]
+
+**Multiple items**: "Subscribe to plan with add-ons"
+→ [
+  {"price": "{{BASE_PLAN_PRICE}}", "quantity": 1},
+  {"price": "price_addon_storage", "quantity": 2}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the subscription items...',
+        generationType: 'json-array',
+      },
     },
     // Items - OPTIONAL for update_subscription
     {
@@ -284,6 +365,50 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
       condition: {
         field: 'operation',
         value: ['update_subscription'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate Stripe subscription items JSON array for updates.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.item_id>\`, \`<function1.result.new_quantity>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{PREMIUM_PRICE_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of subscription item objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### ITEM STRUCTURE FOR UPDATES
+For adding items:
+- **price**: Price ID (price_xxx)
+- **quantity**: Number of units
+
+For updating existing items:
+- **id**: Existing subscription item ID (si_xxx)
+- **quantity**: New quantity
+- **deleted**: true to remove item
+
+### EXAMPLES
+
+**Add item**: "Add premium feature"
+→ [{"price": "price_premium_feature", "quantity": 1}]
+
+**With variables**: "Update quantity from previous block"
+→ [{"id": <agent1.subscription_item_id>, "quantity": <function1.new_seat_count>}]
+
+**Remove item**: "Remove add-on"
+→ [{"id": "si_addon_item", "deleted": true}]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the subscription item changes...',
+        generationType: 'json-array',
       },
     },
     {
@@ -393,6 +518,49 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
         field: 'operation',
         value: ['create_product', 'update_product'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate a JSON array of product image URLs.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.image_url>\`, \`<function1.result.images>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{CDN_BASE_URL}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of image URL strings. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### IMAGE GUIDELINES
+- URLs must be publicly accessible
+- Supported formats: JPEG, PNG, GIF
+- Stripe recommends images at least 1280x720px
+- Maximum 8 images per product
+
+### EXAMPLES
+
+**Single image**: "Add main product image"
+→ ["https://example.com/products/widget-main.jpg"]
+
+**With variables**: "Use image URLs from previous block"
+→ [<agent1.main_image>, <agent1.secondary_image>]
+
+**Multiple images**: "Add product gallery"
+→ [
+  "{{CDN_BASE_URL}}/products/widget-front.jpg",
+  "{{CDN_BASE_URL}}/products/widget-side.jpg"
+]
+
+### REMEMBER
+Return ONLY a valid JSON array of URL strings - no explanations, no markdown, no extra text.`,
+        placeholder: 'Enter the product image URLs...',
+        generationType: 'json-array',
+      },
     },
     // Price specific fields
     {
@@ -424,6 +592,46 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
       condition: {
         field: 'operation',
         value: 'create_price',
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate Stripe recurring billing configuration JSON.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.interval>\`, \`<function1.result.billing_cycle>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_BILLING_INTERVAL}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON recurring object. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### RECURRING FIELDS
+- **interval**: Billing frequency (day, week, month, year)
+- **interval_count**: Number of intervals between billings (default: 1)
+- **usage_type**: "licensed" (default) or "metered"
+- **aggregate_usage**: For metered: "sum", "last_during_period", "last_ever", "max"
+
+### EXAMPLES
+
+**Monthly**: "Bill monthly"
+→ {"interval": "month", "interval_count": 1}
+
+**With variables**: "Use billing cycle from previous block"
+→ {"interval": <agent1.billing_interval>, "interval_count": <agent1.interval_count>}
+
+**Metered usage**: "Usage-based monthly billing"
+→ {"interval": "month", "usage_type": "metered", "aggregate_usage": "sum"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the billing frequency...',
+        generationType: 'json-object',
       },
     },
     // Common description field
@@ -472,6 +680,47 @@ export const StripeBlock: BlockConfig<StripeResponse> = {
           'create_price',
           'update_price',
         ],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Stripe API developer. Generate Stripe metadata JSON object.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.order_id>\`, \`<function1.result.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{ENVIRONMENT}}\`, \`{{REGION}}\`)
+
+Note: Metadata values must be strings. Variables will be converted to strings automatically.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON metadata object with key-value pairs. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### METADATA GUIDELINES
+- Keys can be up to 40 characters
+- Values can be up to 500 characters
+- All values must be strings
+- Maximum 50 keys per object
+- Use for internal reference data, not sensitive info
+
+### EXAMPLES
+
+**Order reference**: "Add order and customer reference"
+→ {"order_id": "ORD-12345", "customer_ref": "CUST-789"}
+
+**With variables**: "Track data from previous block"
+→ {"order_id": <agent1.order_id>, "user_id": <function1.user_id>, "environment": "{{ENVIRONMENT}}"}
+
+**Integration data**: "Add integration references"
+→ {"crm_id": "CRM-456", "campaign": "spring_sale_2024", "affiliate": "partner_xyz"}
+
+### REMEMBER
+Return ONLY valid JSON with string values - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the metadata you want to add...',
+        generationType: 'json-object',
       },
     },
     // List/Search common fields

@@ -216,6 +216,62 @@ export const MicrosoftTeamsBlock: BlockConfig<MicrosoftTeamsResponse> = {
         ],
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Microsoft Teams messages. Compose professional, clear messages for workplace communication.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.update>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{TEAM_NAME}}\`)
+
+### GUIDELINES
+1. **Tone**: Professional workplace communication
+2. **Structure**: Use clear paragraphs and bullet points
+3. **Mentions**: Use @mentions when needed to notify team members
+4. **Brevity**: Be concise but informative
+5. **Action Items**: Clearly state any required actions
+
+### EXAMPLES
+
+**Team update**: "Share project status update"
+→ 📊 Project Status Update
+
+Hi team,
+
+Here's our weekly progress update:
+
+✅ Completed:
+• Feature A development
+• Code review for PR #123
+
+🔄 In Progress:
+• Testing phase
+• Documentation updates
+
+📅 Next Steps:
+• Release scheduled for Friday
+
+Let me know if you have questions!
+
+**With variables**: "Share automated alert"
+→ ⚠️ System Alert
+
+Service: <agent1.service_name>
+Status: <function1.status>
+Time: <function1.timestamp>
+
+Please review and take action if needed.
+
+### REMEMBER
+Write professional workplace messages. Be clear and actionable.`,
+        placeholder: 'Describe the Teams message you want to send...',
+        generationType: 'message-content',
+      },
     },
     {
       id: 'reactionType',

@@ -212,6 +212,46 @@ export const PostHogBlock: BlockConfig<PostHogResponse> = {
       type: 'long-input',
       placeholder: '{"key": "value"}',
       condition: { field: 'operation', value: 'posthog_capture_event' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert PostHog developer. Generate event properties JSON for PostHog analytics.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.page>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{APP_VERSION}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### PROPERTIES GUIDELINES
+1. **Event Context**: Add properties relevant to the event (page, button, action, etc.)
+2. **User Context**: Include user-related data ($set for person properties)
+3. **System Properties**: Use $ prefix for system properties ($ip, $browser, etc.)
+4. **Types**: Support strings, numbers, booleans, arrays, and nested objects
+
+### EXAMPLES
+
+**Page view**: "Track page view with URL and referrer"
+→ {"$current_url": "https://example.com/products", "$referrer": "https://google.com", "page_title": "Products"}
+
+**Button click**: "Track button click with element info"
+→ {"button_text": "Add to Cart", "product_id": "SKU-123", "price": 29.99}
+
+**With variables**: "Track event with data from previous block"
+→ {"user_id": <agent1.user_id>, "action": <agent1.action>, "timestamp": <function1.timestamp>}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the event properties...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'timestamp',
@@ -252,6 +292,43 @@ export const PostHogBlock: BlockConfig<PostHogResponse> = {
       placeholder: '[{"event": "page_view", "distinct_id": "user123", "properties": {...}}]',
       condition: { field: 'operation', value: 'posthog_batch_events' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert PostHog developer. Generate batch events JSON array for PostHog.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.events>\`, \`<function1.result.user_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### BATCH EVENT GUIDELINES
+1. **Array Format**: Must be an array of event objects
+2. **Required Fields**: Each event needs "event" and "distinct_id"
+3. **Properties**: Optional properties object for each event
+4. **Timestamp**: Optional ISO 8601 timestamp
+
+### EXAMPLES
+
+**Multiple events**: "Send page view and button click events"
+→ [{"event": "page_view", "distinct_id": "user123", "properties": {"page": "/home"}}, {"event": "button_clicked", "distinct_id": "user123", "properties": {"button": "signup"}}]
+
+**With timestamps**: "Send events with specific timestamps"
+→ [{"event": "purchase", "distinct_id": "user123", "timestamp": "2024-01-15T10:30:00Z", "properties": {"amount": 99.99}}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the batch events...',
+        generationType: 'json-array',
+      },
     },
 
     // Query fields
@@ -265,6 +342,44 @@ export const PostHogBlock: BlockConfig<PostHogResponse> = {
         value: 'posthog_query',
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert PostHog developer. Generate HogQL queries for PostHog analytics.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY the HogQL query or JSON query object. Do not include any explanations, markdown formatting, comments, or additional text.
+
+### HOGQL GUIDELINES
+1. **SQL-like**: HogQL is similar to SQL with PostHog-specific functions
+2. **Tables**: events, persons, groups, session_recordings
+3. **Event Properties**: Access via properties.$property_name
+4. **Person Properties**: Access via person.properties.$property_name
+5. **Time Functions**: now(), toDateTime(), dateDiff()
+
+### EXAMPLES
+
+**Count events**: "Count page views in last 7 days"
+→ SELECT count() FROM events WHERE event = 'page_view' AND timestamp > now() - INTERVAL 7 DAY
+
+**Group by**: "Count events by browser"
+→ SELECT properties.$browser as browser, count() as count FROM events GROUP BY browser ORDER BY count DESC LIMIT 10
+
+**Person data**: "Get users by email domain"
+→ SELECT distinct_id, person.properties.email FROM events WHERE person.properties.email LIKE '%@example.com' LIMIT 100
+
+### REMEMBER
+Return ONLY the query - no explanations.`,
+        placeholder: 'Describe the data you want to query...',
+        generationType: 'sql-query',
+      },
     },
     {
       id: 'query',

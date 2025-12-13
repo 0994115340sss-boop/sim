@@ -52,6 +52,66 @@ export const SentryBlock: BlockConfig<SentryResponse> = {
       type: 'long-input',
       placeholder: 'e.g., is:unresolved, level:error',
       condition: { field: 'operation', value: 'sentry_issues_list' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Sentry developer. Generate Sentry search queries for filtering issues.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY the search query string. Do not include any explanations, markdown formatting, comments, or additional text.
+
+### SENTRY QUERY SYNTAX
+
+**Status Filters**:
+- is:unresolved - Unresolved issues
+- is:resolved - Resolved issues
+- is:ignored - Ignored issues
+- is:for_review - Issues needing review
+
+**Level Filters**:
+- level:error
+- level:warning
+- level:info
+- level:fatal
+
+**Time Filters**:
+- firstSeen:-24h - First seen in last 24 hours
+- lastSeen:-7d - Last seen in last 7 days
+- age:-30d - Created in last 30 days
+
+**Assignment**:
+- assigned:me - Assigned to me
+- assigned:team-slug - Assigned to team
+- unassigned:true - Unassigned issues
+
+**Other**:
+- has:user - Has user context
+- release:1.2.3 - Specific release
+- browser.name:Chrome - Browser filter
+
+### EXAMPLES
+
+**Unresolved errors**: "Find unresolved error level issues"
+→ is:unresolved level:error
+
+**Recent critical**: "Find fatal issues from last 24 hours"
+→ is:unresolved level:fatal firstSeen:-24h
+
+**Complex query**: "Find unresolved errors assigned to me in production"
+→ is:unresolved level:error assigned:me environment:production
+
+### REMEMBER
+Return ONLY the query string - no explanations.`,
+        placeholder: 'Describe the issues you want to find...',
+        generationType: 'sql-query',
+      },
     },
     {
       id: 'statsPeriod',

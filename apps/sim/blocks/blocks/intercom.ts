@@ -160,6 +160,46 @@ export const IntercomBlock: BlockConfig = {
         field: 'operation',
         value: ['create_contact', 'update_contact'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Intercom developer. Generate custom attributes JSON for Intercom contacts.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.plan_type>\`, \`<function1.result.company>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_PLAN}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### CUSTOM ATTRIBUTES GUIDELINES
+1. **Types**: Strings, numbers, booleans, dates (as Unix timestamps)
+2. **Naming**: Use snake_case or lowercase with underscores
+3. **Limits**: String values max 255 characters
+4. **Pre-defined**: Must be created in Intercom first if strict mode is enabled
+
+### EXAMPLES
+
+**User attributes**: "Set plan and company info"
+→ {"plan_type": "enterprise", "company_name": "Acme Corp", "seats": 50}
+
+**With variables**: "Use data from previous block"
+→ {"subscription_id": <agent1.sub_id>, "mrr": <function1.monthly_revenue>, "industry": <agent1.company_industry>}
+
+**Boolean flags**: "Set feature flags"
+→ {"has_completed_onboarding": true, "beta_tester": false, "vip_customer": true}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the custom attributes...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'query',
@@ -170,6 +210,46 @@ export const IntercomBlock: BlockConfig = {
       condition: {
         field: 'operation',
         value: ['search_contacts', 'search_conversations'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Intercom developer. Generate Intercom search queries.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY the search query (JSON object for advanced search, or text for simple search). Do not include any explanations.
+
+### INTERCOM SEARCH QUERY GUIDELINES
+1. **Simple Text**: Just enter text for basic search
+2. **Advanced**: JSON object with "query" containing filter/operator structure
+3. **Operators**: field, operator (=, !=, IN, NIN, <, >, ~, !~, ^, $), value
+4. **Combining**: Use AND/OR operators to combine conditions
+
+### EXAMPLES
+
+**Simple search**: "Find contacts with example.com email"
+→ example.com
+
+**By email**: "Find contact with specific email"
+→ {"query": {"field": "email", "operator": "=", "value": "user@example.com"}}
+
+**Multiple conditions**: "Find VIP customers from Acme"
+→ {"query": {"operator": "AND", "value": [{"field": "custom_attributes.vip_customer", "operator": "=", "value": true}, {"field": "custom_attributes.company_name", "operator": "=", "value": "Acme"}]}}
+
+**With variables**: "Search for contact by email from previous block"
+→ {"query": {"field": "email", "operator": "=", "value": <agent1.email>}}
+
+### REMEMBER
+Return ONLY the query - no explanations.`,
+        placeholder: 'Describe what you want to search for...',
+        generationType: 'json-object',
       },
     },
     // Company fields

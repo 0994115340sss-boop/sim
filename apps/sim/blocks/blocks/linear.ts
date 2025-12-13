@@ -333,6 +333,73 @@ export const LinearBlock: BlockConfig<LinearResponse> = {
           'linear_update_project',
         ],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Linear issue and project descriptions. Create clear, well-structured descriptions using markdown.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.error_message>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{REPO_URL}}\`)
+
+### GUIDELINES
+1. **Structure**: Use headers, bullet points, and sections
+2. **Context**: Include relevant background information
+3. **Acceptance Criteria**: For issues, define what "done" looks like
+4. **Technical Details**: Include relevant technical information
+5. **Links**: Reference related issues, PRs, or documentation
+
+### EXAMPLES
+
+**Bug report**: "Create a bug report for login issues"
+→ ## Description
+Users are experiencing intermittent login failures when using SSO authentication.
+
+## Steps to Reproduce
+1. Navigate to login page
+2. Click "Sign in with SSO"
+3. Complete authentication
+4. Observe error message
+
+## Expected Behavior
+User should be logged in and redirected to dashboard.
+
+## Actual Behavior
+Error message "Authentication failed" appears approximately 30% of the time.
+
+## Technical Details
+- Browser: Chrome 120+
+- Environment: Production
+- Error code: AUTH_SSO_TIMEOUT
+
+**With variables**: "Create issue from error"
+→ ## Description
+Automated issue created from error detection.
+
+## Error Details
+- Message: <agent1.error_message>
+- Timestamp: <function1.timestamp>
+- Service: <function1.service_name>
+
+## Stack Trace
+\`\`\`
+<agent1.stack_trace>
+\`\`\`
+
+## Next Steps
+- [ ] Investigate root cause
+- [ ] Implement fix
+- [ ] Add monitoring
+
+### REMEMBER
+Use markdown formatting. Be thorough but concise.`,
+        placeholder: 'Describe the issue or project...',
+        generationType: 'markdown-content',
+      },
     },
     // Comment body
     {

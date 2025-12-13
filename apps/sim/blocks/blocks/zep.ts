@@ -94,6 +94,45 @@ export const ZepBlock: BlockConfig<ZepResponse> = {
         field: 'operation',
         value: 'add_user',
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zep developer. Generate metadata JSON for Zep users.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.plan>\`, \`<function1.result.company>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_PLAN}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### METADATA GUIDELINES
+1. **Purpose**: Store additional user context for memory personalization
+2. **Types**: Strings, numbers, booleans, arrays, nested objects
+3. **Use Cases**: User preferences, account info, conversation context
+
+### EXAMPLES
+
+**User context**: "Store user preferences"
+→ {"language": "en", "timezone": "America/New_York", "notifications": true}
+
+**Account info**: "Store account and subscription data"
+→ {"plan": "enterprise", "company": "Acme Inc", "signup_date": "2024-01-15"}
+
+**With variables**: "Use data from previous block"
+→ {"plan": <agent1.subscription_plan>, "company": <agent1.company_name>, "user_type": "{{DEFAULT_USER_TYPE}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the user metadata...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'messages',
@@ -106,6 +145,46 @@ export const ZepBlock: BlockConfig<ZepResponse> = {
         value: 'add_messages',
       },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zep developer. Generate messages JSON array for Zep memory.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.content>\`, \`<function1.result.response>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### MESSAGES GUIDELINES
+1. **Format**: Array of message objects with "role" and "content"
+2. **Roles**: "user", "assistant", "system"
+3. **Content**: The message text
+4. **Optional**: uuid, created_at, metadata, token_count
+
+### EXAMPLES
+
+**Single message**: "Add user message"
+→ [{"role": "user", "content": "Hello, how can you help me today?"}]
+
+**Conversation**: "Add user and assistant exchange"
+→ [{"role": "user", "content": "What's the weather like?"}, {"role": "assistant", "content": "I don't have real-time weather data, but I can help you find a weather service."}]
+
+**With variables**: "Add conversation from previous block"
+→ [{"role": "user", "content": <agent1.user_message>}, {"role": "assistant", "content": <agent1.assistant_response>}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the messages to add...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'mode',

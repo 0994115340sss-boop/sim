@@ -29,6 +29,56 @@ export const WhatsAppBlock: BlockConfig<WhatsAppResponse> = {
       type: 'long-input',
       placeholder: 'Enter your message',
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing WhatsApp messages. Compose clear, friendly messages optimized for mobile.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.customer_name>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{BUSINESS_NAME}}\`)
+
+### GUIDELINES
+1. **Tone**: Friendly and conversational, appropriate for WhatsApp
+2. **Length**: Keep messages concise for mobile reading
+3. **Emojis**: Use emojis naturally to add warmth
+4. **Structure**: Use line breaks for readability
+5. **No Markdown**: WhatsApp has limited formatting support
+
+### EXAMPLES
+
+**Customer notification**: "Send order confirmation"
+→ Hi! 👋
+
+Your order has been confirmed! 🎉
+
+Order #12345
+Total: $99.99
+
+We'll notify you when it ships. Thanks for shopping with us! 💙
+
+**With variables**: "Send appointment reminder"
+→ Hi <agent1.customer_name>! 👋
+
+Just a reminder about your appointment:
+
+📅 Date: <function1.date>
+⏰ Time: <function1.time>
+📍 Location: {{BUSINESS_ADDRESS}}
+
+Reply YES to confirm or call us to reschedule.
+
+See you soon! 😊
+
+### REMEMBER
+Keep messages mobile-friendly and conversational.`,
+        placeholder: 'Describe the WhatsApp message you want to send...',
+        generationType: 'message-content',
+      },
     },
     {
       id: 'phoneNumberId',

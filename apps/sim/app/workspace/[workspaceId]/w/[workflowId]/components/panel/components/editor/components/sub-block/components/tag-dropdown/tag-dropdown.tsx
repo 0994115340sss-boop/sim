@@ -14,10 +14,7 @@ import {
   usePopoverContext,
 } from '@/components/emcn'
 import { cn } from '@/lib/core/utils/cn'
-import {
-  extractFieldsFromSchema,
-  parseResponseFormatSafely,
-} from '@/lib/core/utils/response-format'
+import { extractFieldsFromSchema, findActiveOutputSchema } from '@/lib/core/utils/response-format'
 import { createLogger } from '@/lib/logs/console/logger'
 import { getBlockOutputPaths, getBlockOutputType } from '@/lib/workflows/blocks/block-outputs'
 import { TRIGGER_TYPES } from '@/lib/workflows/triggers/triggers'
@@ -545,8 +542,9 @@ export const TagDropdown: React.FC<TagDropdownProps> = ({
       const normalizedBlockName = normalizeBlockName(blockName)
 
       const mergedSubBlocks = getMergedSubBlocks(activeSourceBlockId)
-      const responseFormatValue = mergedSubBlocks?.responseFormat?.value
-      const responseFormat = parseResponseFormatSafely(responseFormatValue, activeSourceBlockId)
+
+      // Use generalized schema detection to find active output schema
+      const activeOutputSchema = findActiveOutputSchema(blockConfig, mergedSubBlocks)
 
       let blockTags: string[]
 
@@ -576,8 +574,8 @@ export const TagDropdown: React.FC<TagDropdownProps> = ({
         } else {
           blockTags = [normalizedBlockName]
         }
-      } else if (responseFormat) {
-        const schemaFields = extractFieldsFromSchema(responseFormat)
+      } else if (activeOutputSchema) {
+        const schemaFields = extractFieldsFromSchema(activeOutputSchema.schema)
         if (schemaFields.length > 0) {
           blockTags = schemaFields.map((field) => `${normalizedBlockName}.${field.name}`)
         } else {
@@ -883,8 +881,8 @@ export const TagDropdown: React.FC<TagDropdownProps> = ({
       const normalizedBlockName = normalizeBlockName(blockName)
 
       const mergedSubBlocks = getMergedSubBlocks(accessibleBlockId)
-      const responseFormatValue = mergedSubBlocks?.responseFormat?.value
-      const responseFormat = parseResponseFormatSafely(responseFormatValue, accessibleBlockId)
+
+      const activeOutputSchema = findActiveOutputSchema(blockConfig, mergedSubBlocks)
 
       let blockTags: string[]
 
@@ -935,8 +933,8 @@ export const TagDropdown: React.FC<TagDropdownProps> = ({
         } else {
           blockTags = [normalizedBlockName]
         }
-      } else if (responseFormat) {
-        const schemaFields = extractFieldsFromSchema(responseFormat)
+      } else if (activeOutputSchema) {
+        const schemaFields = extractFieldsFromSchema(activeOutputSchema.schema)
         if (schemaFields.length > 0) {
           blockTags = schemaFields.map((field) => `${normalizedBlockName}.${field.name}`)
         } else {

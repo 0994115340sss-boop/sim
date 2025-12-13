@@ -116,6 +116,85 @@ export const ConfluenceBlock: BlockConfig<ConfluenceResponse> = {
       type: 'long-input',
       placeholder: 'Enter content for the page',
       condition: { field: 'operation', value: ['create', 'update'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at writing Confluence documentation. Create clear, professional documentation content.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.content>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{PROJECT_NAME}}\`)
+
+### CONFLUENCE FORMATTING
+Confluence uses wiki markup or can accept HTML:
+- h1. h2. h3. for headers
+- *bold* and _italic_
+- * bullet lists
+- # numbered lists
+- {code}code blocks{code}
+- [link text|URL]
+- {info}, {warning}, {note} macros
+
+### GUIDELINES
+1. **Structure**: Use clear hierarchy with headers
+2. **Documentation Style**: Write for clarity and completeness
+3. **Tables**: Use tables for structured data
+4. **Code Examples**: Include code samples where relevant
+5. **Links**: Reference related pages and resources
+
+### EXAMPLES
+
+**Technical documentation**: "Write API endpoint documentation"
+→ h1. User API Endpoints
+
+h2. Overview
+This document describes the User API endpoints available in the system.
+
+h2. Authentication
+All endpoints require a valid API key in the Authorization header.
+
+h2. Endpoints
+
+h3. GET /api/users
+Retrieves a list of all users.
+
+*Parameters:*
+| Name | Type | Required | Description |
+| limit | integer | No | Maximum results (default: 100) |
+| offset | integer | No | Pagination offset |
+
+*Response:*
+{code:json}
+{
+  "users": [...],
+  "total": 150
+}
+{code}
+
+{info}Rate limit: 100 requests per minute{info}
+
+**With variables**: "Create page from template"
+→ h1. <agent1.title>
+
+h2. Overview
+<agent1.summary>
+
+h2. Details
+<function1.content>
+
+h2. Related Pages
+* [Related Page 1]
+* [Related Page 2]
+
+### REMEMBER
+Use Confluence wiki markup. Write clear, professional documentation.`,
+        placeholder: 'Describe the Confluence content...',
+        generationType: 'markdown-content',
+      },
     },
     {
       id: 'parentId',

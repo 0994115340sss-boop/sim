@@ -92,6 +92,13 @@ export const Neo4jBlock: BlockConfig<Neo4jResponse> = {
 ### CONTEXT
 {context}
 
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_id>\`, \`<function1.result.name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_LIMIT}}\`)
+
+Use parameters ($paramName) for values in Cypher queries and define them in the Parameters field.
+
 ### CRITICAL INSTRUCTION
 Return ONLY the Cypher query. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw Cypher query.
 

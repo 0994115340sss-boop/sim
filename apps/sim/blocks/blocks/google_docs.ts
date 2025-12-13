@@ -107,6 +107,73 @@ export const GoogleDocsBlock: BlockConfig<GoogleDocsResponse> = {
       placeholder: 'Enter document content',
       condition: { field: 'operation', value: 'write' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert document writer. Create clear, professional content for Google Docs.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.data>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COMPANY_NAME}}\`)
+
+### GUIDELINES
+1. **Structure**: Use clear headings and sections
+2. **Professional Tone**: Write clearly and professionally
+3. **Formatting**: Use paragraphs, lists, and emphasis
+4. **Completeness**: Include all relevant information
+5. **Readability**: Keep sentences and paragraphs concise
+
+### EXAMPLES
+
+**Report**: "Write a weekly status report"
+→ Weekly Status Report
+Week of January 15, 2024
+
+Executive Summary
+This week saw significant progress on our key initiatives with completion of Phase 1 development.
+
+Accomplishments
+• Completed user authentication module
+• Deployed staging environment
+• Conducted security review
+
+In Progress
+• Database optimization (75% complete)
+• API documentation updates
+• Performance testing
+
+Blockers
+• Awaiting design approval for dashboard redesign
+
+Next Week's Priorities
+1. Complete database optimization
+2. Begin Phase 2 development
+3. Stakeholder review meeting
+
+**With variables**: "Create document from data"
+→ <agent1.document_title>
+
+Date: <function1.date>
+Author: {{AUTHOR_NAME}}
+
+Overview
+<agent1.summary>
+
+Details
+<function1.content>
+
+Next Steps
+<agent1.action_items>
+
+### REMEMBER
+Write clear, professional content. Structure with headings and lists.`,
+        placeholder: 'Describe the document content...',
+        generationType: 'markdown-content',
+      },
     },
     // Content Field for create operation
     {
@@ -115,6 +182,30 @@ export const GoogleDocsBlock: BlockConfig<GoogleDocsResponse> = {
       type: 'long-input',
       placeholder: 'Enter document content',
       condition: { field: 'operation', value: 'create' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert document writer. Create clear, professional content for Google Docs.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+### GUIDELINES
+1. Use clear headings and sections
+2. Write professionally and concisely
+3. Use bullet points and numbered lists
+4. Include all relevant information
+
+### REMEMBER
+Write clear, professional content. Structure with headings and lists.`,
+        placeholder: 'Describe the document content...',
+        generationType: 'markdown-content',
+      },
     },
   ],
   tools: {

@@ -132,6 +132,76 @@ export const WordPressBlock: BlockConfig<WordPressResponse> = {
           'wordpress_update_page',
         ],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert WordPress content writer. Create engaging, well-structured content for blog posts and pages.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.topic>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SITE_NAME}}\`)
+
+### WORDPRESS FORMATTING
+WordPress accepts HTML or plain text:
+- <h2>, <h3> for headings
+- <p> for paragraphs
+- <ul>, <ol>, <li> for lists
+- <strong>, <em> for emphasis
+- <a href=""> for links
+- <blockquote> for quotes
+- <img> for images
+
+### GUIDELINES
+1. **SEO**: Use headings hierarchically for SEO
+2. **Readability**: Short paragraphs, bullet points
+3. **Engagement**: Start with a hook, end with a CTA
+4. **Formatting**: Use HTML for rich formatting
+5. **Links**: Include internal and external links
+
+### EXAMPLES
+
+**Blog post**: "Write a post about productivity tips"
+→ <p>Are you looking to boost your productivity? Here are five proven strategies that can transform your workday.</p>
+
+<h2>1. Start with Your Most Important Task</h2>
+<p>Tackle your biggest challenge first thing in the morning when your energy is highest. This approach, often called "eating the frog," ensures your critical work gets done.</p>
+
+<h2>2. Use Time Blocking</h2>
+<p>Divide your day into focused blocks:</p>
+<ul>
+<li>Deep work sessions (2-3 hours)</li>
+<li>Email and communication (30 minutes)</li>
+<li>Breaks and transitions (15 minutes)</li>
+</ul>
+
+<h2>3. Minimize Distractions</h2>
+<p>Create a distraction-free environment by:</p>
+<ul>
+<li>Turning off notifications</li>
+<li>Using website blockers</li>
+<li>Setting "do not disturb" hours</li>
+</ul>
+
+<p><strong>Ready to transform your productivity?</strong> Start implementing these tips today and watch your efficiency soar!</p>
+
+**With variables**: "Create post from data"
+→ <h2><agent1.title></h2>
+
+<p><agent1.introduction></p>
+
+<function1.body_content>
+
+<p>For more information, visit {{SITE_URL}}.</p>
+
+### REMEMBER
+Use HTML formatting. Write engaging, SEO-friendly content.`,
+        placeholder: 'Describe the content you want to write...',
+        generationType: 'html-content',
+      },
     },
 
     // Post/Page Status

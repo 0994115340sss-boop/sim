@@ -177,6 +177,48 @@ export const ZendeskBlock: BlockConfig = {
         field: 'operation',
         value: ['create_ticket', 'update_ticket'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zendesk API developer. Generate Zendesk custom fields JSON object.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.field_value>\`, \`<function1.result.category>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_CATEGORY}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON custom fields object. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### CUSTOM FIELDS STRUCTURE
+Custom fields use field IDs as keys with their values:
+- Text fields: String values
+- Numeric fields: Number values
+- Dropdown fields: Option value or ID
+- Checkbox fields: true/false
+- Date fields: ISO date string
+
+### EXAMPLES
+
+**Single custom field**: "Set priority category"
+→ {"12345678": "high_priority"}
+
+**Multiple custom fields**: "Set category and region"
+→ {"12345678": "support", "87654321": "north_america"}
+
+**With variables**: "Use values from previous block"
+→ {"12345678": <agent1.category>, "87654321": <agent1.region>}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the custom fields you want to set...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'tickets',
@@ -187,6 +229,61 @@ export const ZendeskBlock: BlockConfig = {
       condition: {
         field: 'operation',
         value: ['create_tickets_bulk', 'update_tickets_bulk'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zendesk API developer. Generate Zendesk tickets JSON array for bulk operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.tickets>\`, \`<function1.result.subject>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_GROUP_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of ticket objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### TICKET STRUCTURE
+For creating tickets:
+- **subject**: Ticket subject (required)
+- **description**: Ticket description
+- **priority**: low, normal, high, urgent
+- **status**: new, open, pending, hold, solved
+- **type**: problem, incident, question, task
+- **assignee_id**: User ID to assign to
+- **group_id**: Group ID
+
+For updating tickets:
+- Include ticket **id** for each ticket to update
+
+### EXAMPLES
+
+**Create tickets**: "Create two support tickets"
+→ [
+  {"subject": "Login issue", "description": "Cannot login", "priority": "high"},
+  {"subject": "Feature request", "description": "Add dark mode", "priority": "normal"}
+]
+
+**With variables**: "Create tickets from previous block data"
+→ [
+  {"subject": <agent1.subject>, "description": <agent1.description>, "priority": <agent1.priority>}
+]
+
+**Update tickets**: "Update status for multiple tickets"
+→ [
+  {"id": 12345, "status": "solved"},
+  {"id": 12346, "status": "pending"}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the tickets you want to create or update...',
+        generationType: 'json-array',
       },
     },
     {
@@ -257,6 +354,58 @@ export const ZendeskBlock: BlockConfig = {
         field: 'operation',
         value: ['create_users_bulk', 'update_users_bulk'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zendesk API developer. Generate Zendesk users JSON array for bulk operations.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.users>\`, \`<function1.result.name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_ORG_ID}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of user objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### USER STRUCTURE
+For creating users:
+- **name**: User's name (required)
+- **email**: User's email
+- **role**: end-user, agent, admin
+- **organization_id**: Organization ID
+
+For updating users:
+- Include user **id** for each user to update
+
+### EXAMPLES
+
+**Create users**: "Create two new users"
+→ [
+  {"name": "John Doe", "email": "john@example.com", "role": "end-user"},
+  {"name": "Jane Smith", "email": "jane@example.com", "role": "end-user"}
+]
+
+**With variables**: "Create users from previous block"
+→ [
+  {"name": <agent1.name>, "email": <agent1.email>, "organization_id": "{{DEFAULT_ORG_ID}}"}
+]
+
+**Update users**: "Update roles for multiple users"
+→ [
+  {"id": 12345, "role": "agent"},
+  {"id": 12346, "role": "admin"}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the users you want to create or update...',
+        generationType: 'json-array',
+      },
     },
     // Organization fields
     {
@@ -304,6 +453,50 @@ export const ZendeskBlock: BlockConfig = {
       condition: {
         field: 'operation',
         value: ['create_organizations_bulk'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Zendesk API developer. Generate Zendesk organizations JSON array for bulk creation.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.org_name>\`, \`<function1.result.domain>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_TAGS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of organization objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### ORGANIZATION STRUCTURE
+- **name**: Organization name (required)
+- **domain_names**: Array of domain names
+- **details**: Description/details
+- **notes**: Internal notes
+- **group_id**: Associated group ID
+- **tags**: Array of tags
+
+### EXAMPLES
+
+**Create organizations**: "Create two companies"
+→ [
+  {"name": "Acme Corp", "domain_names": ["acme.com"], "details": "Enterprise customer"},
+  {"name": "Widget Inc", "domain_names": ["widget.io"], "details": "Small business"}
+]
+
+**With variables**: "Create organizations from previous block"
+→ [
+  {"name": <agent1.company_name>, "domain_names": [<agent1.domain>], "tags": ["{{DEFAULT_TAGS}}"]}
+]
+
+### REMEMBER
+Return ONLY a valid JSON array - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the organizations you want to create...',
+        generationType: 'json-array',
       },
     },
     // Search fields

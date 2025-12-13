@@ -167,6 +167,49 @@ export const SharepointBlock: BlockConfig<SharepointResponse> = {
       placeholder: 'Enter list item fields',
       canonicalParamId: 'listItemFields',
       condition: { field: 'operation', value: ['update_list', 'add_list_items'] },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SharePoint developer. Generate list item fields JSON for SharePoint lists.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.title>\`, \`<function1.result.status>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_STATUS}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### LIST ITEM FIELDS GUIDELINES
+1. **Format**: JSON object with column internal names as keys
+2. **Column Names**: Use internal names (usually no spaces), not display names
+3. **Field Types**: Support text, number, boolean, date, choice, lookup, etc.
+4. **For add_list_items**: Can be a single object or array of objects
+
+### EXAMPLES
+
+**Single item update**: "Update title and status"
+→ {"Title": "Updated Task", "Status": "Completed"}
+
+**Add single item**: "Add a new task"
+→ {"Title": "New Task", "Description": "Task description", "Priority": "High", "DueDate": "2024-12-31"}
+
+**Add multiple items**: "Add two tasks"
+→ [{"Title": "Task 1", "Status": "Active"}, {"Title": "Task 2", "Status": "Active"}]
+
+**With variables**: "Update with data from previous block"
+→ {"Title": <agent1.task_title>, "AssignedTo": <agent1.assignee>, "Status": "{{DEFAULT_STATUS}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the list item fields...',
+        generationType: 'json-object',
+      },
     },
 
     // Upload File operation fields

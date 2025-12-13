@@ -395,6 +395,45 @@ export const MailchimpBlock: BlockConfig = {
         field: 'operation',
         value: ['add_member', 'add_or_update_member', 'update_member'],
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Mailchimp developer. Generate merge fields JSON for Mailchimp members.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.first_name>\`, \`<function1.result.phone>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{DEFAULT_SOURCE}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### MERGE FIELDS GUIDELINES
+1. **Standard Fields**: FNAME, LNAME, PHONE, ADDRESS, BIRTHDAY
+2. **Custom Fields**: Use your audience's custom merge field tags
+3. **Format**: Key is merge tag (uppercase), value is the data
+
+### EXAMPLES
+
+**Basic info**: "Add first name and last name"
+→ {"FNAME": "John", "LNAME": "Doe"}
+
+**With address**: "Add full contact details"
+→ {"FNAME": "John", "LNAME": "Doe", "PHONE": "555-1234", "ADDRESS": {"addr1": "123 Main St", "city": "Boston", "state": "MA", "zip": "02101"}}
+
+**With variables**: "Use data from previous block"
+→ {"FNAME": <agent1.first_name>, "LNAME": <agent1.last_name>, "EMAIL": <agent1.email>}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the merge fields you want to set...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'interests',
@@ -418,6 +457,42 @@ export const MailchimpBlock: BlockConfig = {
       condition: {
         field: 'operation',
         value: ['add_member_tags', 'remove_member_tags'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Mailchimp developer. Generate tags JSON for Mailchimp members.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of tag objects. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON array.
+
+### TAGS GUIDELINES
+1. **Format**: Array of objects with "name" and "status" fields
+2. **Status**: "active" to add tag, "inactive" to remove tag
+3. **Name**: The tag name string
+
+### EXAMPLES
+
+**Add tags**: "Add VIP and Newsletter tags"
+→ [{"name": "VIP", "status": "active"}, {"name": "Newsletter", "status": "active"}]
+
+**Remove tags**: "Remove Inactive tag"
+→ [{"name": "Inactive", "status": "inactive"}]
+
+**With variables**: "Add tag from previous block"
+→ [{"name": <agent1.tag_name>, "status": "active"}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the tags you want to add or remove...',
+        generationType: 'json-array',
       },
     },
     // Campaign fields
@@ -900,6 +975,50 @@ export const MailchimpBlock: BlockConfig = {
       condition: {
         field: 'operation',
         value: ['create_batch_operation'],
+      },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Mailchimp developer. Generate batch operations JSON for Mailchimp API.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.email>\`, \`<function1.result.list_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{LIST_ID}}\`)
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of operation objects. Do not include any explanations, markdown formatting, or comments.
+
+### BATCH OPERATION STRUCTURE
+Each operation object should have:
+- **method**: HTTP method (GET, POST, PUT, PATCH, DELETE)
+- **path**: API endpoint path (e.g., /lists/{list_id}/members)
+- **operation_id**: Unique identifier for the operation (optional)
+- **params**: Query parameters (optional)
+- **body**: Request body as JSON string (for POST/PUT/PATCH)
+
+### EXAMPLES
+
+**Add multiple members**: "Add 3 members to a list"
+→ [
+  {"method": "POST", "path": "/lists/abc123/members", "body": "{\\"email_address\\":\\"john@example.com\\",\\"status\\":\\"subscribed\\"}"},
+  {"method": "POST", "path": "/lists/abc123/members", "body": "{\\"email_address\\":\\"jane@example.com\\",\\"status\\":\\"subscribed\\"}"},
+  {"method": "POST", "path": "/lists/abc123/members", "body": "{\\"email_address\\":\\"bob@example.com\\",\\"status\\":\\"subscribed\\"}"}
+]
+
+**Update multiple members**: "Update member statuses"
+→ [
+  {"method": "PATCH", "path": "/lists/abc123/members/hash1", "body": "{\\"status\\":\\"unsubscribed\\"}"},
+  {"method": "PATCH", "path": "/lists/abc123/members/hash2", "body": "{\\"status\\":\\"unsubscribed\\"}"}
+]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the batch operations you want to perform...',
+        generationType: 'json-array',
       },
     },
     // Pagination and filtering

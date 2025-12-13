@@ -303,6 +303,82 @@ export const RedditBlock: BlockConfig<RedditResponse> = {
           value: 'text',
         },
       },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Reddit content creator. Write engaging posts using Reddit markdown formatting.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.data>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+### REDDIT MARKDOWN
+- **bold** with double asterisks
+- *italic* with asterisks
+- ~~strikethrough~~ with tildes
+- [link text](url)
+- > quotes
+- * bullet points
+- 1. numbered lists
+- \`inline code\` and code blocks
+- ^superscript with caret
+- --- horizontal rule
+
+### GUIDELINES
+1. **Subreddit Rules**: Consider the subreddit's culture and rules
+2. **Formatting**: Use markdown for structure
+3. **Authenticity**: Reddit values genuine, helpful content
+4. **Context**: Provide enough background for discussion
+5. **Engagement**: Ask questions or invite discussion
+6. **TL;DR**: For long posts, include a summary at the end
+
+### EXAMPLES
+
+**Discussion post**: "Start a discussion about productivity tools"
+→ After trying 20+ productivity tools over the past year, here's what I've learned...
+
+**What worked:**
+- Time blocking apps actually helped me focus
+- Simple todo lists beat complex project management tools
+- Note-taking apps with good search are essential
+
+**What didn't:**
+- Gamification features felt gimmicky
+- Apps that require too much setup
+- Anything that adds friction to capturing ideas
+
+I'm curious - what tools have made the biggest difference for you? And which ones did you abandon?
+
+---
+
+**TL;DR**: Tried tons of productivity tools. Simple beats complex. Time blocking works. What's your go-to tool?
+
+**With variables**: "Share automated report"
+→ **Weekly Stats Update**
+
+Here are this week's community stats:
+
+| Metric | Value |
+|--------|-------|
+| New Members | <function1.new_members> |
+| Posts | <function1.post_count> |
+| Comments | <function1.comment_count> |
+
+**Highlights:**
+- <agent1.highlight_1>
+- <agent1.highlight_2>
+
+What content would you like to see more of? Let us know in the comments!
+
+### REMEMBER
+Use Reddit markdown. Write authentic content appropriate for the subreddit.`,
+        placeholder: 'Describe the Reddit post you want to create...',
+        generationType: 'social-post',
+      },
     },
     {
       id: 'url',

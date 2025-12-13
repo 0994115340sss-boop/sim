@@ -95,6 +95,45 @@ export const MicrosoftExcelBlock: BlockConfig<MicrosoftExcelResponse> = {
         'Enter values as JSON array of arrays (e.g., [["A1", "B1"], ["A2", "B2"]]) or an array of objects (e.g., [{"name":"John", "age":30}, {"name":"Jane", "age":25}])',
       condition: { field: 'operation', value: 'write' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at Microsoft Excel data formatting. Generate JSON data for writing to Excel.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.data>\`, \`<function1.result.rows>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or comments.
+
+### DATA FORMATS
+
+**Array of Arrays** (Row-based):
+[["Header1", "Header2"], ["Value1", "Value2"]]
+
+**Array of Objects** (Column-mapped):
+[{"name": "John", "age": 30}, {"name": "Jane", "age": 25}]
+
+### EXAMPLES
+
+**Simple write**: "Write headers and data rows"
+→ [["Name", "Email", "Age"], ["John Doe", "john@example.com", 30], ["Jane Smith", "jane@example.com", 25]]
+
+**With variables**: "Write data from previous block"
+→ [["Name", "Status"], [<agent1.name>, <agent1.status>]]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the data you want to write...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'valueInputOption',
@@ -114,6 +153,33 @@ export const MicrosoftExcelBlock: BlockConfig<MicrosoftExcelResponse> = {
         'Enter values as JSON array of arrays (e.g., [["A1", "B1"], ["A2", "B2"]]) or an array of objects (e.g., [{"name":"John", "age":30}, {"name":"Jane", "age":25}])',
       condition: { field: 'operation', value: 'update' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at Microsoft Excel data formatting. Generate JSON data for updating Excel.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or comments.
+
+### EXAMPLES
+**Update cells**: "Update with new values"
+→ [["Updated Name", "Updated Email"], ["John Doe", "john.new@example.com"]]
+
+**With variables**: "Update with data from previous block"
+→ [[<agent1.name>, <agent1.email>]]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the data you want to update...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'valueInputOption',
@@ -133,6 +199,33 @@ export const MicrosoftExcelBlock: BlockConfig<MicrosoftExcelResponse> = {
         'Enter values as JSON array of arrays (e.g., [["A1", "B1"], ["A2", "B2"]]) or an array of objects (e.g., [{"name":"John", "age":30}, {"name":"Jane", "age":25}])',
       condition: { field: 'operation', value: 'table_add' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert at Microsoft Excel data formatting. Generate JSON data for adding rows to an Excel table.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or comments.
+
+### EXAMPLES
+**Add rows**: "Add new data rows to the table"
+→ [["John Doe", "john@example.com", "Active"], ["Jane Smith", "jane@example.com", "Active"]]
+
+**With variables**: "Add data from previous block"
+→ [[<agent1.name>, <agent1.email>, <agent1.status>]]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the data you want to add...',
+        generationType: 'json-array',
+      },
     },
   ],
   tools: {

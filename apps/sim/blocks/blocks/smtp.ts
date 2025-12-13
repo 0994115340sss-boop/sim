@@ -86,6 +86,57 @@ export const SmtpBlock: BlockConfig<SmtpSendMailResult> = {
       type: 'long-input',
       placeholder: 'Email content',
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert email writer. Compose professional, clear, and effective email content.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.recipient_name>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{SENDER_NAME}}\`)
+
+### GUIDELINES
+1. **Content Type**: Plain text or HTML based on selected type
+2. **Structure**: Use clear paragraphs and formatting
+3. **Brevity**: Be concise but complete
+4. **Personalization**: Use variables for dynamic content
+
+### EXAMPLES
+
+**Notification email**: "Send a system alert notification"
+→ System Alert
+
+A new event has been detected that requires your attention.
+
+Details:
+- Event Type: Security Alert
+- Time: <function1.timestamp>
+- Status: Requires Review
+
+Please log in to review this alert.
+
+**With variables**: "Send appointment reminder"
+→ Hi <agent1.customer_name>,
+
+This is a reminder about your upcoming appointment:
+
+Date: <function1.appointment_date>
+Time: <function1.appointment_time>
+Location: {{OFFICE_ADDRESS}}
+
+Please arrive 10 minutes early.
+
+See you soon!
+
+### REMEMBER
+Write the email body only. Format based on selected content type.`,
+        placeholder: 'Describe the email you want to write...',
+        generationType: 'email-content',
+      },
     },
     {
       id: 'contentType',

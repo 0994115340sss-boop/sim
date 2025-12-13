@@ -42,6 +42,68 @@ export const XBlock: BlockConfig<XResponse> = {
       placeholder: "What's happening?",
       condition: { field: 'operation', value: 'x_write' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert X (Twitter) content creator. Write engaging tweets optimized for the platform.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.topic>\`, \`<function1.result>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{HANDLE}}\`)
+
+### X/TWITTER BEST PRACTICES
+1. **Length**: 280 characters max, but shorter often performs better
+2. **Hook**: Lead with the most interesting part
+3. **Hashtags**: Use 1-2 relevant hashtags sparingly
+4. **Threads**: For longer content, suggest a thread format
+5. **Engagement**: Ask questions or invite responses
+6. **Emojis**: Use to add personality and visual breaks
+
+### GUIDELINES
+- Be concise and punchy
+- Use conversational tone
+- Avoid excessive hashtags
+- Include a hook in the first few words
+- Create curiosity or value
+
+### EXAMPLES
+
+**Announcement**: "Tweet about a new feature launch"
+→ Just shipped: Dark mode is finally here 🌙
+
+Your eyes will thank you.
+
+Update now →
+
+**Hot take**: "Share an opinion on tech trends"
+→ Unpopular opinion: Most "AI tools" are just GPT wrappers with nice UIs.
+
+The real innovation isn't the model—it's the UX.
+
+**With variables**: "Share automated update"
+→ 📊 Weekly stats update:
+
+Users: <function1.user_count>
+Growth: <function1.growth_rate>%
+
+Thanks for being part of the journey! 🚀
+
+**Thread starter**: "Start a thread on a topic"
+→ I've spent 10 years building products.
+
+Here are 7 lessons I wish I knew on day one:
+
+🧵 (1/8)
+
+### REMEMBER
+Keep it under 280 characters. Be concise and engaging.`,
+        placeholder: 'Describe the tweet you want to create...',
+        generationType: 'social-post',
+      },
     },
     {
       id: 'replyTo',

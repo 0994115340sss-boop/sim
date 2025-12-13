@@ -201,6 +201,44 @@ export const GoogleSlidesBlock: BlockConfig<GoogleSlidesResponse> = {
       placeholder: 'JSON array: [{"layoutPlaceholder":{"type":"TITLE"},"objectId":"my_title"}]',
       condition: { field: 'operation', value: 'add_slide' },
       mode: 'advanced',
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Google Slides API developer. Generate placeholder ID mappings JSON for adding slides.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax for dynamic object IDs.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or comments.
+
+### PLACEHOLDER TYPES
+- TITLE: Main title placeholder
+- SUBTITLE: Subtitle placeholder
+- BODY: Main body text placeholder
+- CENTERED_TITLE: Centered title
+- HEADER: Header area
+- FOOTER: Footer area
+
+### FORMAT
+Each mapping needs: "layoutPlaceholder" with "type", and "objectId" (your custom ID)
+
+### EXAMPLES
+
+**Title and body**: "Map title and body placeholders"
+→ [{"layoutPlaceholder": {"type": "TITLE"}, "objectId": "my_title_1"}, {"layoutPlaceholder": {"type": "BODY"}, "objectId": "my_body_1"}]
+
+**Just title**: "Map only the title placeholder"
+→ [{"layoutPlaceholder": {"type": "TITLE"}, "objectId": "slide_title"}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the placeholder mappings...',
+        generationType: 'json-array',
+      },
     },
 
     // ========== Add Image Operation Fields ==========

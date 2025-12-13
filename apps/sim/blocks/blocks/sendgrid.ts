@@ -94,6 +94,60 @@ export const SendGridBlock: BlockConfig<SendMailResult> = {
       type: 'long-input',
       placeholder: 'Email body content (required unless using template)',
       condition: { field: 'operation', value: 'send_mail' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert email writer. Compose professional, clear, and effective email content for SendGrid.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_name>\`, \`<function1.result.data>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COMPANY_NAME}}\`)
+
+### GUIDELINES
+1. **Content Type**: Content can be plain text or HTML based on the selected content type
+2. **Structure**: Use clear formatting appropriate to the content type
+3. **Personalization**: Use variables for dynamic content
+4. **Call to Action**: Include clear CTAs for marketing emails
+
+### EXAMPLES
+
+**Plain text newsletter**: "Write a product update announcement"
+→ Hi there,
+
+We're excited to announce our latest product update!
+
+Here's what's new:
+- Improved performance
+- New dashboard features
+- Enhanced security
+
+Check out the full details on our blog.
+
+Thanks for being a valued customer!
+
+**With variables**: "Send welcome email"
+→ Welcome to {{COMPANY_NAME}}, <agent1.user_name>!
+
+We're thrilled to have you on board. Here's what you can do next:
+
+1. Complete your profile
+2. Explore our features
+3. Join our community
+
+If you have any questions, just reply to this email.
+
+Best,
+The {{COMPANY_NAME}} Team
+
+### REMEMBER
+Write the email content only. Format depends on selected content type (plain text or HTML).`,
+        placeholder: 'Describe the email content you want to write...',
+        generationType: 'email-content',
+      },
     },
     {
       id: 'contentType',
@@ -147,6 +201,49 @@ export const SendGridBlock: BlockConfig<SendMailResult> = {
       type: 'code',
       placeholder: '{"name": "John", "order_id": "12345"}',
       condition: { field: 'operation', value: 'send_mail' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert SendGrid developer. Generate dynamic template data JSON for SendGrid email templates.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks and environment variables:
+- **Block variables**: Use \`<block_name.field_name>\` syntax (e.g., \`<agent1.user_name>\`, \`<function1.result.order_id>\`)
+- **Environment variables**: Use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{COMPANY_NAME}}\`)
+
+Do NOT wrap variable references in quotes for non-string values.
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, comments, or additional text. Just the raw JSON object.
+
+### TEMPLATE DATA GUIDELINES
+1. **Keys**: Must match the handlebars variables in your SendGrid template (e.g., {{name}}, {{order_id}})
+2. **Values**: Can be strings, numbers, booleans, arrays, or nested objects
+3. **Arrays**: Use for iteration in templates ({{#each items}})
+4. **Nested Objects**: Use dot notation in templates ({{user.name}})
+
+### EXAMPLES
+
+**Simple personalization**: "Send email with name and order details"
+→ {"name": "John Doe", "order_id": "ORD-12345", "order_date": "2024-01-15"}
+
+**With variables**: "Use data from previous block"
+→ {"name": <agent1.customer_name>, "order_id": <agent1.order_id>, "total": <function1.order_total>}
+
+**With items array**: "Order confirmation with line items"
+→ {"customer_name": "John", "items": [{"name": "Widget", "price": 29.99, "qty": 2}], "total": 59.98}
+
+**Nested data**: "Email with user and company info"
+→ {"user": {"name": "John", "email": "john@example.com"}, "company": "{{COMPANY_NAME}}"}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations, no markdown, no extra text.`,
+        placeholder: 'Describe the template data you need...',
+        generationType: 'json-object',
+      },
     },
     // File upload (basic mode)
     {

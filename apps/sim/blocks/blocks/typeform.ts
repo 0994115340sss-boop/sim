@@ -180,6 +180,45 @@ export const TypeformBlock: BlockConfig<TypeformResponse> = {
       type: 'long-input',
       placeholder: 'JSON array of field objects',
       condition: { field: 'operation', value: 'typeform_create_form' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Typeform developer. Generate form fields JSON for creating Typeform forms.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array. Do not include any explanations, markdown formatting, or comments.
+
+### FIELD TYPES
+- short_text, long_text, email, phone_number, number
+- multiple_choice, dropdown, yes_no, rating, opinion_scale
+- date, file_upload, picture_choice, statement, group
+
+### FIELD FORMAT
+Each field needs: "type", "title", and optionally "properties" for choices, validation, etc.
+
+### EXAMPLES
+
+**Simple form**: "Create a contact form with name and email"
+→ [{"type": "short_text", "title": "What is your name?"}, {"type": "email", "title": "What is your email?"}]
+
+**Multiple choice**: "Create a survey question with options"
+→ [{"type": "multiple_choice", "title": "How satisfied are you?", "properties": {"choices": [{"label": "Very satisfied"}, {"label": "Satisfied"}, {"label": "Neutral"}, {"label": "Unsatisfied"}]}}]
+
+**Rating field**: "Add a 1-10 rating question"
+→ [{"type": "rating", "title": "Rate your experience", "properties": {"steps": 10}}]
+
+### REMEMBER
+Return ONLY valid JSON array - no explanations.`,
+        placeholder: 'Describe the form fields...',
+        generationType: 'json-array',
+      },
     },
     {
       id: 'settings',
@@ -187,6 +226,46 @@ export const TypeformBlock: BlockConfig<TypeformResponse> = {
       type: 'long-input',
       placeholder: 'JSON object for form settings',
       condition: { field: 'operation', value: 'typeform_create_form' },
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Typeform developer. Generate form settings JSON for Typeform.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax (e.g., \`{{REDIRECT_URL}}\`).
+
+### CRITICAL INSTRUCTION
+Return ONLY valid JSON. Do not include any explanations, markdown formatting, or comments.
+
+### SETTINGS OPTIONS
+- language: Form language code (e.g., "en", "es", "fr")
+- progress_bar: "percentage" or "proportion"
+- show_progress_bar: boolean
+- is_public: boolean
+- is_trial: boolean
+- redirect_after_submit_url: URL to redirect after submission
+- meta: { title, description, image } for SEO
+
+### EXAMPLES
+
+**Basic settings**: "English form with progress bar"
+→ {"language": "en", "show_progress_bar": true, "progress_bar": "percentage", "is_public": true}
+
+**With redirect**: "Redirect to thank you page after submit"
+→ {"language": "en", "is_public": true, "redirect_after_submit_url": "https://example.com/thank-you"}
+
+**With SEO meta**: "Add meta information"
+→ {"language": "en", "is_public": true, "meta": {"title": "Customer Survey", "description": "Help us improve"}}
+
+### REMEMBER
+Return ONLY valid JSON - no explanations.`,
+        placeholder: 'Describe the form settings...',
+        generationType: 'json-object',
+      },
     },
     {
       id: 'themeId',
@@ -203,6 +282,53 @@ export const TypeformBlock: BlockConfig<TypeformResponse> = {
       placeholder: 'JSON array of patch operations (RFC 6902)',
       condition: { field: 'operation', value: 'typeform_update_form' },
       required: true,
+      wandConfig: {
+        enabled: true,
+        maintainHistory: true,
+        prompt: `You are an expert Typeform developer. Generate JSON Patch operations (RFC 6902) for updating Typeform forms.
+
+### CONTEXT
+{context}
+
+### VARIABLE RESOLUTION
+You can reference variables from previous blocks using \`<block_name.field_name>\` syntax.
+Environment variables use \`{{ENV_VAR_NAME}}\` syntax.
+
+### CRITICAL INSTRUCTION
+Return ONLY a valid JSON array of patch operations. Do not include any explanations or comments.
+
+### JSON PATCH OPERATIONS
+- **add**: Add a new field or value
+- **remove**: Remove a field or value
+- **replace**: Replace an existing value
+- **move**: Move a field from one location to another
+- **copy**: Copy a field to a new location
+
+### FORMAT
+Each operation needs: "op" (operation), "path" (JSON pointer), and "value" (for add/replace)
+
+### EXAMPLES
+
+**Update title**: "Change form title to 'New Survey'"
+→ [{"op": "replace", "path": "/title", "value": "New Survey"}]
+
+**Add field**: "Add a new email field"
+→ [{"op": "add", "path": "/fields/-", "value": {"type": "email", "title": "Your email"}}]
+
+**Remove field**: "Remove the third field"
+→ [{"op": "remove", "path": "/fields/2"}]
+
+**Update settings**: "Change language to Spanish"
+→ [{"op": "replace", "path": "/settings/language", "value": "es"}]
+
+**Multiple operations**: "Update title and add redirect"
+→ [{"op": "replace", "path": "/title", "value": "Updated Form"}, {"op": "add", "path": "/settings/redirect_after_submit_url", "value": "https://example.com/done"}]
+
+### REMEMBER
+Return ONLY valid JSON array of patch operations - no explanations.`,
+        placeholder: 'Describe the changes to make...',
+        generationType: 'json-array',
+      },
     },
     ...getTrigger('typeform_webhook').subBlocks,
   ],
