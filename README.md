@@ -1,4 +1,4 @@
-<p align="center">
+[<p align="center">
   <a href="https://sim.ai" target="_blank" rel="noopener noreferrer">
     <img src="apps/sim/public/logo/reverse/text/large.png" alt="Sim Logo" width="500"/>
   </a>
@@ -284,4 +284,4 @@ We welcome contributions! Please see our [Contributing Guide](.github/CONTRIBUTI
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-<p align="center">Made with ❤️ by the Sim Team</p>
+<p align="center">Made with ❤️ by the Sim Team</p>]
